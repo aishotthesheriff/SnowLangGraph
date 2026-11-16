@@ -74,7 +74,7 @@ FROM SPECIFICATION $$
         "CUSTOMER_FEEDBACK_SEARCH": {
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             },
             "search_service": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.SUPPORT_TICKETS_SEARCH",
@@ -86,7 +86,7 @@ FROM SPECIFICATION $$
             "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_CONTENT_V2",
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             }
         }
@@ -157,7 +157,7 @@ FROM SPECIFICATION $$
         "BUSINESS_INTELLIGENCE_ANALYST": {
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             },
             "semantic_view": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.CUSTOMER_BEHAVIOR_ANALYST"
@@ -167,7 +167,7 @@ FROM SPECIFICATION $$
             "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_BEHAVIOR_SEGMENT_V2",
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             }
         }
@@ -238,7 +238,7 @@ FROM SPECIFICATION $$
         "STRATEGIC_MARKET_ANALYST": {
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             },
             "semantic_view": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.STRATEGIC_RESEARCH_ANALYST"
@@ -248,7 +248,7 @@ FROM SPECIFICATION $$
             "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_SEGMENT_V2",
             "execution_environment": {
                 "type": "warehouse",
-                "warehouse": "COMPUTE_WH",
+                "warehouse": "SNOWFLAKE_LEARNING_WH",
                 "query_timeout": 300
             }
         }

@@ -49,3 +49,13 @@ dist/
 # Logs
 *.log
 logs/
+
+# Local LangGraph dev & TruLens runtime state
+.langgraph_api/
+default.sqlite
+
+# Graphify local cache & machine-specific sidecars (keep graphify-out/ outputs tracked)
+graphify-out/cache/
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/.vocab.txt
