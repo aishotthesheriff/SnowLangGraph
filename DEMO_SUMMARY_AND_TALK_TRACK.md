@@ -74,6 +74,10 @@ Order: show the result first, explain it second, prove it third. The full step-b
 *(Studio: ask "What is the average customer lifetime value by industry?")*
 > "Why a Semantic View? Before I fixed it, this exact question failed in my evaluation. Cortex Analyst refused to guess: customer lifetime value had no governed definition, and it asked which formula I meant. That is the right behavior. So I defined CLV once in Snowflake—final monthly revenue times months active, for churned customers—and both agents now share it. The LLM translates English into SQL, but only over metrics the business has defined. The formula is visible, the answer is repeatable, and the definition sits under Snowflake's governance instead of in a prompt. The eval suite found the gap before a customer did."
 
+### The Trace Caught Bad Behavior (60 sec, optional)
+*(Studio: ask "How many urgent API support tickets are there?", then open the LangSmith trace)*
+> "This run succeeded, with no errors and rows returned, but the answer is wrong: 729 'urgent API tickets,' and one sample is a password reset. The trace shows why: my ticket search ORs five keywords, and 'urgent' matches a password ticket that says 'need access urgently.' No error alert would fire. The trace is how I found it, and now I can decide the fix: require every keyword, use the priority column, or route it through the Semantic View. My evaluators check routing, SQL and errors. A relevance evaluator is the next one to add."
+
 ### Closing — Production Path (20 sec)
 > "Everything you saw ran live on a Snowflake trial account. Offline evals in LangSmith (`route_match`, `sql_executed_with_rows`, `eval_zero_errors`) guard every change to a Semantic View or a planner rule. On a full account, running `sql/02` and `sql/04` and setting `SNOWFLAKE_USE_CORTEX_AGENTS=true` swaps in Snowflake-managed Cortex Agents and Cortex Search on the same graph. That mode is written and not yet tested, because the trial blocks it."
 

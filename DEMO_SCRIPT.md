@@ -158,6 +158,32 @@ Point at the interpretation line: `realized CLV = average of final_monthly_reven
 
 ---
 
+## Act 4B: The Trace Caught Bad Behavior (~1.5 min, optional)
+
+**Screen:** Tab 1 (Studio, new thread), then the LangSmith trace for that run.
+
+**Action:** Paste and submit:
+```text
+How many urgent API support tickets are there?
+```
+Expect `729` matching tickets, `642` customers, `186` "urgent" (verified 2026-11-17 on run `01a1e879-bea7-7405-b387-d60a92d65449`). The sample table includes `TKT_00006033`: "I forgot my password and the reset email isn't coming through. Need access urgently." That is an `account_access` ticket. It has nothing to do with the API.
+
+**In the LangSmith trace:**
+1. Open `snowflake_support_tickets_search`, then the three `snowflake_sql_execute` spans. Point at the SQL: the keywords are OR-ed together.
+2. Say the keywords out loud: `urgent`, `api`, `support`, `tickets`, `there`. Any ticket that matches one word counts.
+
+**Say:**
+> "I want to show you a failure on purpose. The run succeeded: no errors, rows returned, green checks. But look at the answer. It says 729 urgent API tickets, and one of the samples is a password reset. The trace shows why. My ticket search splits the question into five keywords and ORs them. The word 'urgent' matches a password ticket that says 'need access urgently,' and 'there' and 'support' match almost everything. Also, 'urgent' is searched in the ticket text, not in the priority column.
+>
+> Nothing crashed, so a normal error alert would stay quiet. The trace is what let me see it. And now I get to decide what to do with it: require every keyword (AND), use the priority column for 'urgent,' or hand this question to Cortex Analyst and a Semantic View, which already know what a priority is. Without the trace, I would be shipping 729 as the answer."
+
+**Honest limit (say it if asked):**
+> "My current evaluators check routing, SQL ran, rows returned, and zero errors. They all pass on this run. None of them check that the answer is relevant. That is the next evaluator I would add, and this run is the first test case for it."
+
+**Note:** `186` counts tickets with priority `high` or `urgent`, so the "urgent" label is also loose. Do not quote `186` as "urgent only."
+
+---
+
 ## Act 5: Offline Evals & Production Upgrade Path (~1.5 min)
 
 **Screen:** Tab 2 (LangSmith Experiments, `snowlanggraph-trial-c05502ee`) + terminal (optional live run).

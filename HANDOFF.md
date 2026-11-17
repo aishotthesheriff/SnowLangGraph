@@ -123,3 +123,7 @@ Still open: reloading the data so usage events cover all customers (needs the ow
 
 Added `CUSTOMER_LIFETIME_VALUE` (realized CLV of churned customers = final monthly revenue x days since signup / 30) to both semantic views in `sql/03_setup_semantic_views.sql`, and applied it live (`CREATE OR REPLACE`). Both views return the same values (technology about $5,034, retail about $4,878). The CLV question now returns rows through the graph. I also added `AVG_LIFETIME` to the research view (it was only in the analyst view). Smoke check numbers did not change. Act 4 of `DEMO_SCRIPT.md` now tells the "why a Semantic View" story. Average lifetime in Act 4 is about 390 to 450 days, not 1,271. The older experiment `09f9954a` still shows the CLV miss, which is the "before" half of the story.
 
+## 11. Known bad behavior kept on purpose (2026-11-17)
+
+`run_content_sql_search` ORs keywords and matches "urgent" in ticket text. Question "How many urgent API support tickets are there?" gives 729 tickets (642 customers, 186 high/urgent) and includes a password-reset ticket. It is demo Act 4B ("the trace caught bad behavior"). Do not fix it before the demo. Fix after: AND logic or the priority column, plus a relevance evaluator. Example run: `01a1e879-bea7-7405-b387-d60a92d65449` in the LangSmith `default` project.
+
