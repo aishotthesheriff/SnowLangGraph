@@ -70,6 +70,10 @@ Order: show the result first, explain it second, prove it third. The full step-b
 *(Split screen: LangSmith waterfall on the left, Snowsight chart of `AGENT_OBSERVABILITY_LOGS` for the same trace ID on the right)*
 > "Most agent demos stop at the left side. On the right is Snowflake's own query history for the same run: the agent's SQL statements as bars on the right. Every LangSmith SQL span carries the Snowflake query ID, and every SQL statement the agent runs carries a `QUERY_TAG` with the LangSmith trace ID. Text-to-SQL time lives on the LangSmith side, while a platform team can check SQL time and rows per step from inside Snowflake."
 
+### Why a Semantic View — The CLV Story (60 sec)
+*(Studio: ask "What is the average customer lifetime value by industry?")*
+> "Why a Semantic View? Before I fixed it, this exact question failed in my evaluation. Cortex Analyst refused to guess: customer lifetime value had no governed definition, and it asked which formula I meant. That is the right behavior. So I defined CLV once in Snowflake—final monthly revenue times months active, for churned customers—and both agents now share it. The LLM translates English into SQL, but only over metrics the business has defined. The formula is visible, the answer is repeatable, and the definition sits under Snowflake's governance instead of in a prompt. The eval suite found the gap before a customer did."
+
 ### Closing — Production Path (20 sec)
 > "Everything you saw ran live on a Snowflake trial account. Offline evals in LangSmith (`route_match`, `sql_executed_with_rows`, `eval_zero_errors`) guard every change to a Semantic View or a planner rule. On a full account, running `sql/02` and `sql/04` and setting `SNOWFLAKE_USE_CORTEX_AGENTS=true` swaps in Snowflake-managed Cortex Agents and Cortex Search on the same graph. That mode is written and not yet tested, because the trial blocks it."
 

@@ -115,7 +115,10 @@ CREATE OR REPLACE SEMANTIC VIEW CUSTOMER_BEHAVIOR_ANALYST
     CHURN_EVENTS.TOTAL_CHURNED AS COUNT(CHURN_EVENTS.CUSTOMER_ID)
       COMMENT = 'Total churned customers',
     CHURN_EVENTS.AVG_LIFETIME AS AVG(CHURN_EVENTS.DAYS_SINCE_SIGNUP)
-      COMMENT = 'Average customer lifetime'
+      COMMENT = 'Average customer lifetime',
+    CHURN_EVENTS.CUSTOMER_LIFETIME_VALUE AS AVG(CHURN_EVENTS.FINAL_MONTHLY_REVENUE * CHURN_EVENTS.DAYS_SINCE_SIGNUP / 30)
+      WITH SYNONYMS = ('CLV', 'CLTV', 'LTV', 'lifetime value', 'customer lifetime value')
+      COMMENT = 'Realized customer lifetime value of churned customers: final monthly revenue times months active (days since signup / 30). Excludes customers who are still active.'
   )
   COMMENT = 'Customer behavior analytics for usage patterns, churn analysis, and retention insights';
 
@@ -217,7 +220,13 @@ CREATE OR REPLACE SEMANTIC VIEW STRATEGIC_RESEARCH_ANALYST
     CHURN_EVENTS.CHURNED_COUNT AS COUNT(CHURN_EVENTS.CUSTOMER_ID)
       COMMENT = 'Churned customers',
     CHURN_EVENTS.LOST_REVENUE AS SUM(CHURN_EVENTS.FINAL_MONTHLY_REVENUE)
-      COMMENT = 'Total lost revenue'
+      COMMENT = 'Total lost revenue',
+    CHURN_EVENTS.AVG_LIFETIME AS AVG(CHURN_EVENTS.DAYS_SINCE_SIGNUP)
+      WITH SYNONYMS = ('average lifetime', 'average customer lifetime', 'tenure')
+      COMMENT = 'Average customer lifetime in days (churned customers)',
+    CHURN_EVENTS.CUSTOMER_LIFETIME_VALUE AS AVG(CHURN_EVENTS.FINAL_MONTHLY_REVENUE * CHURN_EVENTS.DAYS_SINCE_SIGNUP / 30)
+      WITH SYNONYMS = ('CLV', 'CLTV', 'LTV', 'lifetime value', 'customer lifetime value')
+      COMMENT = 'Realized customer lifetime value of churned customers: final monthly revenue times months active (days since signup / 30). Excludes customers who are still active.'
   )
   COMMENT = 'Strategic research and market intelligence for executive-level business analysis';
 

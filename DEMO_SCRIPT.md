@@ -124,21 +124,37 @@ ORDER BY STEP_NUMBER, START_TIME;
 
 ---
 
-## Act 4: Contrast — A Simple Question Takes One Hop (~1 min)
+## Act 4: One Hop, and Why a Semantic View (~2 min)
 
-**Screen:** Tab 1 full width again (LangSmith Studio — new thread). Cut this act first if time is short.
+**Screen:** Tab 1 full width again (LangSmith Studio — new thread). Cut the CLV part first if time is short.
 
-**Action:** Paste and submit:
+**Action 1:** Paste and submit:
 ```text
 What industries have the highest total MRR and average customer lifetime?
 ```
 
 **Watch & Point Out:**
 1. Only **`RESEARCH_AGENT`** lights up. The other two stay dark.
-2. The final output shows Cortex Analyst's interpretation, the generated `SEMANTIC_VIEW` SQL, and the live table (`healthcare` at `$423,966.55` MRR, `finance` at `$405,595.52`, `education` at `$397,174.61`, ~`1,271+` days average lifetime).
+2. The final output shows Cortex Analyst's interpretation, the generated `SEMANTIC_VIEW` SQL, and the live table (`healthcare` at `$423,966.55` MRR, `finance` at `$405,595.52`, `education` at `$397,174.61`; average lifetime about `390` to `450` days for churned customers).
 
 **Say:**
-> "Same graph, different question, one hop. The supervisor does not spend calls on agents it does not need. And the SQL you see came from a governed Semantic View, so the definition of MRR lives in Snowflake, not in a prompt."
+> "Same graph, different question, one hop. The supervisor does not spend calls on agents it does not need."
+
+**Action 2 (the Semantic View story):** Paste and submit:
+```text
+What is the average customer lifetime value by industry?
+```
+Point at the interpretation line: `realized CLV = average of final_monthly_revenue * days_since_signup / 30`. The top industry is `technology` at about `$5,000` (`retail` is next at about `$4,900`).
+
+**Say (this is the "why"):**
+> "Here is why I put a Semantic View between the agents and the data. Before I fixed it, I ran this exact question and the system did not guess. Cortex Analyst answered: 'customer lifetime value is not defined in the semantic model, and there are several valid ways to calculate it. Which one do you mean?' It wrote no SQL. In my evaluation that showed up as one failed run out of twelve—I did not hide it, I treated it as a finding.
+>
+> A model that guesses a business formula gives you a confident number nobody can audit. So I defined CLV once, in Snowflake: final monthly revenue times months active, for churned customers. Now both specialist agents use the same definition, the question works, and the answer comes with the formula in plain view. The definition lives in the data platform, under Snowflake's access controls, not in a prompt that someone can quietly edit.
+>
+> That is the pattern: the LLM translates English into a query, but it can only use metrics, joins and synonyms that the business has defined. Same question, same answer, every run—and it is testable, because my evaluation suite caught this gap before a customer did."
+
+**If asked "is that a good CLV formula?":**
+> "It is a realized value for customers who already left, so it understates customers who are still active. I chose the simple, honest definition and wrote that limit in the metric comment. A predictive CLV is a better next step, and it would be a change in one place, in the Semantic View."
 
 ---
 

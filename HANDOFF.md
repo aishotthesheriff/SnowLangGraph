@@ -119,3 +119,7 @@ Still open: reloading the data so usage events cover all customers (needs the ow
 
 `evaluate_observability.py` now has 12 questions (was 4). Experiment `snowlanggraph-trial-09f9954a`: 12 runs. `route_match`, `eval_zero_errors`, `execution_success` and `zero_errors` pass 12/12. `sql_executed_with_rows` and `non_empty_results` pass 11/12. The one miss is the CLV question (see `PARKED.md`). The demo docs still point to the older 4-question experiment `c05502ee`. That is fine for the demo.
 
+## 10. CLV metric (2026-11-17)
+
+Added `CUSTOMER_LIFETIME_VALUE` (realized CLV of churned customers = final monthly revenue x days since signup / 30) to both semantic views in `sql/03_setup_semantic_views.sql`, and applied it live (`CREATE OR REPLACE`). Both views return the same values (technology about $5,034, retail about $4,878). The CLV question now returns rows through the graph. I also added `AVG_LIFETIME` to the research view (it was only in the analyst view). Smoke check numbers did not change. Act 4 of `DEMO_SCRIPT.md` now tells the "why a Semantic View" story. Average lifetime in Act 4 is about 390 to 450 days, not 1,271. The older experiment `09f9954a` still shows the CLV miss, which is the "before" half of the story.
+
