@@ -54,7 +54,7 @@ CREATE OR REPLACE SEMANTIC VIEW CUSTOMER_BEHAVIOR_ANALYST
       COMMENT = 'Unique customer identifier',
     CUSTOMERS.COMPANY_SIZE AS CUSTOMERS.COMPANY_SIZE
       WITH SYNONYMS = ('business size')
-      COMMENT = 'Company size: small, medium, large',
+      COMMENT = 'Company size: small, medium, large, enterprise',
     CUSTOMERS.INDUSTRY AS CUSTOMERS.INDUSTRY
       WITH SYNONYMS = ('sector', 'vertical')
       COMMENT = 'Customer industry',

@@ -2,6 +2,8 @@
 -- 04_setup_udfs.sql
 -- Creates custom AI UDFs (tools for agents)
 -- Run BEFORE agents since agents use these as tools
+-- Date windows count back from the newest row in the data, not from CURRENT_DATE(),
+-- because the demo data ends on 2024-10-01.
 -- ============================================================================
 
 USE DATABASE CUSTOMER_INTELLIGENCE_DB;
@@ -43,16 +45,16 @@ segment_usage AS (
     SUM(u.actions_count) as total_actions
   FROM usage_events u
   INNER JOIN parsed_customer_ids pci ON u.customer_id = pci.customer_id
-  WHERE u.event_date >= CURRENT_DATE() - 365 - 90  -- Handle data offset
+  WHERE u.event_date >= (SELECT MAX(event_date) FROM usage_events) - 90  -- last 90 days of data
 ),
 segment_support AS (
   SELECT 
     COUNT(*) as total_tickets,
     ROUND(AVG(satisfaction_score), 2) as avg_satisfaction,
-    COUNT(CASE WHEN priority IN (''high'', ''critical'') THEN 1 END) as high_priority_tickets
+    COUNT(CASE WHEN priority IN (''high'', ''urgent'') THEN 1 END) as high_priority_tickets
   FROM support_tickets s
   INNER JOIN parsed_customer_ids pci ON s.customer_id = pci.customer_id
-  WHERE s.created_date >= CURRENT_DATE() - 365 - 90  -- Handle data offset
+  WHERE s.created_date >= (SELECT MAX(created_date) FROM support_tickets) - 90  -- last 90 days of data
 ),
 segment_summary AS (
   SELECT 
@@ -141,7 +143,7 @@ target_tickets AS (
     st.created_date
   FROM support_tickets st
   INNER JOIN parsed_customer_ids pci ON st.customer_id = pci.customer_id
-  WHERE st.created_date >= CURRENT_DATE() - 365 - 90  -- Handle 365-day data offset
+  WHERE st.created_date >= (SELECT MAX(created_date) FROM support_tickets) - 90  -- last 90 days of data
   ORDER BY st.created_date DESC
   LIMIT 10  -- Focus on most recent tickets only
 ),
@@ -150,7 +152,7 @@ content_summary AS (
     COUNT(*) as total_tickets,
     COUNT(DISTINCT customer_id) as customers_with_tickets,
     ROUND(AVG(satisfaction_score), 2) as avg_satisfaction,
-    COUNT(CASE WHEN priority IN (''high'', ''critical'') THEN 1 END) as urgent_tickets,
+    COUNT(CASE WHEN priority IN (''high'', ''urgent'') THEN 1 END) as urgent_tickets,
     LISTAGG(DISTINCT category, '', '') as ticket_categories,
     -- Combine recent ticket text for AI analysis (limit to avoid token limits)
     SUBSTRING(LISTAGG(ticket_text, '' | ''), 1, 1000) as combined_ticket_text
@@ -233,10 +235,10 @@ behavior_metrics AS (
     ROUND(AVG(u.session_duration_minutes), 2) as avg_session_duration,
     SUM(u.actions_count) as total_actions,
     MAX(u.event_date) as last_activity_date,
-    COALESCE(DATEDIFF(''day'', MAX(u.event_date), CURRENT_DATE()), 999) as days_since_last_activity
+    COALESCE(DATEDIFF(''day'', MAX(u.event_date), (SELECT MAX(event_date) FROM usage_events)), 999) as days_since_last_activity
   FROM usage_events u
   INNER JOIN parsed_customer_ids pci ON u.customer_id = pci.customer_id
-  WHERE u.event_date >= CURRENT_DATE() - 365 - analysis_days  -- Handle data offset
+  WHERE u.event_date >= (SELECT MAX(event_date) FROM usage_events) - analysis_days  -- last N days of data
 ),
 churn_risk_calculation AS (
   SELECT 

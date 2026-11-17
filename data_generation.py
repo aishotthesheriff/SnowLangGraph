@@ -56,8 +56,11 @@ def create_tables(session):
     
     # Grant ownership on the schema to the current role
     current_role = session.sql("SELECT CURRENT_ROLE()").collect()[0][0]
-    session.sql(f"GRANT OWNERSHIP ON SCHEMA PUBLIC TO ROLE {current_role}").collect()
-    print(f"✅ Granted ownership on schema PUBLIC to role {current_role}")
+    try:
+        session.sql(f"GRANT OWNERSHIP ON SCHEMA PUBLIC TO ROLE {current_role} COPY CURRENT GRANTS").collect()
+        print(f"✅ Granted ownership on schema PUBLIC to role {current_role}")
+    except Exception as exc:
+        print(f"⚠️ Could not grant schema ownership to {current_role} (continuing): {exc}")
     
     tables = {
         "CUSTOMERS": """
@@ -540,8 +543,8 @@ def insert_support_tickets_data(session, tickets_data):
         values = []
         for ticket in batch:
             escaped_text = ticket['ticket_text'].replace("'", "''")
-            resolution_time = ticket['resolution_time_hours'] if ticket['resolution_time_hours'] else 'NULL'
-            satisfaction = ticket['satisfaction_score'] if ticket['satisfaction_score'] else 'NULL'
+            resolution_time = ticket['resolution_time_hours'] if ticket['resolution_time_hours'] is not None else 'NULL'
+            satisfaction = ticket['satisfaction_score'] if ticket['satisfaction_score'] is not None else 'NULL'
             
             values.append(
                 f"('{ticket['ticket_id']}', '{ticket['customer_id']}', '{ticket['created_date']}', "

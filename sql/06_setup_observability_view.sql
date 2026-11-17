@@ -2,6 +2,8 @@
 -- 06_setup_observability_view.sql
 -- Real-time Snowflake query telemetry view correlated with LangSmith traces
 -- via structured JSON QUERY_TAGs emitted by studio_app.py.
+-- RESULT_LIMIT is applied before the WHERE filter, so it must be large (10000 is the maximum),
+-- or tagged queries drop out when other queries run on the account.
 -- ============================================================================
 
 USE ROLE ACCOUNTADMIN;
@@ -27,7 +29,7 @@ SELECT
     BYTES_SCANNED,
     WAREHOUSE_NAME
 FROM TABLE(CUSTOMER_INTELLIGENCE_DB.INFORMATION_SCHEMA.QUERY_HISTORY(
-    RESULT_LIMIT => 500
+    RESULT_LIMIT => 10000
 ))
 WHERE TRY_PARSE_JSON(QUERY_TAG):app::STRING = 'snowlanggraph'
   AND EXECUTION_STATUS != 'RUNNING'

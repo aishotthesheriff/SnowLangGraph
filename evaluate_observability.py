@@ -9,7 +9,9 @@ Runs three live demonstrations against Snowflake (CUSTOMER_INTELLIGENCE_DB.PUBLI
    correlated `LANGSMITH_TRACE_ID` -> `QUERY_ID` (`sfqid`) trail.
 """
 
+import json
 import os
+import sys
 import uuid
 from typing import Any, Dict, List
 
@@ -19,7 +21,7 @@ from langsmith import Client, evaluate
 from trulens.apps.langgraph import TruGraph
 from trulens.core import TruSession
 
-from studio_app import app, session
+from studio_app import app, get_session
 
 load_dotenv()
 
@@ -50,7 +52,9 @@ def _ensure_dataset(client: Client) -> str:
     if client.has_dataset(dataset_name=DATASET_NAME):
         ds = client.read_dataset(dataset_name=DATASET_NAME)
         existing = list(client.list_examples(dataset_id=ds.id))
-        if len(existing) == len(EVAL_EXAMPLES):
+        current = sorted((json.dumps(e.inputs, sort_keys=True), json.dumps(e.outputs, sort_keys=True)) for e in existing)
+        wanted = sorted((json.dumps(e["inputs"], sort_keys=True), json.dumps(e["outputs"], sort_keys=True)) for e in EVAL_EXAMPLES)
+        if current == wanted:
             return str(ds.id)
         for ex in existing:
             client.delete_example(ex.id)
@@ -108,7 +112,7 @@ def eval_zero_errors(outputs: Dict[str, Any], reference_outputs: Dict[str, Any])
     """Verify zero runtime errors were collected by the supervisor."""
     errors = outputs.get("execution_errors", [])
     return {
-        "key": "zero_errors",
+        "key": "eval_zero_errors",  # the live app already writes its own "zero_errors" feedback
         "score": 1.0 if len(errors) == 0 else 0.0,
         "comment": "ok" if not errors else "; ".join(errors[:3]),
     }
@@ -157,10 +161,10 @@ def run_trulens_recording() -> None:
     print(f"TruLens local store records for this run: {len(df)}")
 
 
-def verify_snowflake_audit_view() -> None:
-    """Query AGENT_OBSERVABILITY_LOGS in Snowflake to show end-to-end correlation."""
+def verify_snowflake_audit_view() -> int:
+    """Query AGENT_OBSERVABILITY_LOGS in Snowflake to show end-to-end correlation. Returns the row count."""
     print("\n=== 3. Verifying Snowflake AGENT_OBSERVABILITY_LOGS View ===")
-    rows = session.sql("""
+    rows = get_session().sql("""
         SELECT
             QUERY_ID,
             LANGSMITH_TRACE_ID,
@@ -171,14 +175,18 @@ def verify_snowflake_audit_view() -> None:
             ELAPSED_MS,
             ROWS_PRODUCED
         FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS
+        ORDER BY START_TIME DESC
         LIMIT 10
     """).collect()
     print(f"Found {len(rows)} correlated query log rows in Snowflake:")
     for r in rows[:6]:
         print(" ", r.as_dict())
+    return len(rows)
 
 
 if __name__ == "__main__":
     run_langsmith_eval()
     run_trulens_recording()
-    verify_snowflake_audit_view()
+    if verify_snowflake_audit_view() == 0:
+        print("FAIL: AGENT_OBSERVABILITY_LOGS returned no correlated rows.")
+        sys.exit(1)

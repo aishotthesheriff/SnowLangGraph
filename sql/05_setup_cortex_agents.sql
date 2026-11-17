@@ -1,7 +1,9 @@
 -- ============================================================================
 -- 05_setup_cortex_agents.sql
 -- Creates the three Cortex Agents for the multi-agent demo
--- Uses JSON format with execution_environment for all tools
+-- Uses JSON format with execution_environment for all tools.
+-- Custom tools are the SQL functions from 04_setup_udfs.sql (tool_resources type "function").
+-- NOT TESTED: the unpaid trial account blocks agents and AI_COMPLETE (399258, 399504).
 -- ============================================================================
 
 CREATE DATABASE IF NOT EXISTS SNOWFLAKE_INTELLIGENCE;
@@ -82,8 +84,8 @@ FROM SPECIFICATION $$
             "title_column": "ticket_text"
         },
         "CUSTOMER_CONTENT_ANALYZER": {
-            "type": "procedure",
-            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_CONTENT_V2",
+            "type": "function",
+            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_CONTENT",
             "execution_environment": {
                 "type": "warehouse",
                 "warehouse": "SNOWFLAKE_LEARNING_WH",
@@ -143,9 +145,9 @@ FROM SPECIFICATION $$
                             "type": "string",
                             "description": "Comma-separated list of customer IDs to analyze"
                         },
-                        "segment_name": {
-                            "type": "string",
-                            "description": "Name of the customer segment for context"
+                        "analysis_days": {
+                            "type": "integer",
+                            "description": "Number of recent days of data to analyze (default 30)"
                         }
                     },
                     "required": ["customer_ids_string"]
@@ -163,8 +165,8 @@ FROM SPECIFICATION $$
             "semantic_view": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.CUSTOMER_BEHAVIOR_ANALYST"
         },
         "CUSTOMER_BEHAVIOR_ANALYZER": {
-            "type": "procedure",
-            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_BEHAVIOR_SEGMENT_V2",
+            "type": "function",
+            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_PREDICT_CHURN_RISK",
             "execution_environment": {
                 "type": "warehouse",
                 "warehouse": "SNOWFLAKE_LEARNING_WH",
@@ -244,8 +246,8 @@ FROM SPECIFICATION $$
             "semantic_view": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.STRATEGIC_RESEARCH_ANALYST"
         },
         "CUSTOMER_SEGMENT_INTELLIGENCE": {
-            "type": "procedure",
-            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_SEGMENT_V2",
+            "type": "function",
+            "identifier": "CUSTOMER_INTELLIGENCE_DB.PUBLIC.AI_ANALYZE_CUSTOMER_SEGMENT",
             "execution_environment": {
                 "type": "warehouse",
                 "warehouse": "SNOWFLAKE_LEARNING_WH",
