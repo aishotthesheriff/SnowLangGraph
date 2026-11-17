@@ -44,6 +44,38 @@ EVAL_EXAMPLES = [
         "inputs": {"question": "Find customers complaining about API issues and analyze their churn rate and monthly revenue"},
         "outputs": {"expected_agents": ["CONTENT_AGENT", "DATA_ANALYST_AGENT", "RESEARCH_AGENT"]},
     },
+    {
+        "inputs": {"question": "Which customers filed urgent support tickets about integrations?"},
+        "outputs": {"expected_agents": ["CONTENT_AGENT"]},
+    },
+    {
+        "inputs": {"question": "Show feature usage and engagement by session duration"},
+        "outputs": {"expected_agents": ["DATA_ANALYST_AGENT"]},
+    },
+    {
+        "inputs": {"question": "Which market segments generate the most revenue?"},
+        "outputs": {"expected_agents": ["RESEARCH_AGENT"]},
+    },
+    {
+        "inputs": {"question": "What is the average customer lifetime value by industry?"},
+        "outputs": {"expected_agents": ["RESEARCH_AGENT"]},
+    },
+    {
+        "inputs": {"question": "Summarize customer sentiment in tickets and compare it with churn"},
+        "outputs": {"expected_agents": ["CONTENT_AGENT", "DATA_ANALYST_AGENT"]},
+    },
+    {
+        "inputs": {"question": "Which industries have the highest revenue and how many support tickets do they file?"},
+        "outputs": {"expected_agents": ["CONTENT_AGENT", "RESEARCH_AGENT"]},
+    },
+    {
+        "inputs": {"question": "How does product usage relate to churn and monthly revenue?"},
+        "outputs": {"expected_agents": ["DATA_ANALYST_AGENT", "RESEARCH_AGENT"]},
+    },
+    {
+        "inputs": {"question": "How many customers do we have in total?"},
+        "outputs": {"expected_agents": ["DATA_ANALYST_AGENT"]},
+    },
 ]
 
 

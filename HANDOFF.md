@@ -114,3 +114,8 @@ Still open: reloading the data so usage events cover all customers (needs the ow
 ## 8. Usage backfill (2026-11-17)
 
 `USAGE_EVENTS` had rows for only the first 2,000 customers (101,711 rows). Now it has `508,637` rows for `9,990` customers. Command: `.venv/bin/python data_generation.py --backfill-usage`. It only inserts, and it stops if the table is not the original load. The seed is fixed, so a full reload (`python data_generation.py`) gives the same rows. Build the rows before connecting, because opening the connection uses the random generator. Live smoke check after the backfill gives the same numbers: 502 / 461 / 132, 1,452 / 110 / $589,348.85. `data_generation.py` and the notebook now use the shared `get_session()`.
+
+## 9. Bigger eval set (2026-11-17)
+
+`evaluate_observability.py` now has 12 questions (was 4). Experiment `snowlanggraph-trial-09f9954a`: 12 runs. `route_match`, `eval_zero_errors`, `execution_success` and `zero_errors` pass 12/12. `sql_executed_with_rows` and `non_empty_results` pass 11/12. The one miss is the CLV question (see `PARKED.md`). The demo docs still point to the older 4-question experiment `c05502ee`. That is fine for the demo.
+
