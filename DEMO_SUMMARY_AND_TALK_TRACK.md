@@ -37,10 +37,10 @@ flowchart LR
 
 - **`DATA_ANALYST_AGENT` & `RESEARCH_AGENT`**: Call Snowflake's live **Cortex Analyst REST API** (`/api/v2/cortex/analyst/message`) against `CUSTOMER_BEHAVIOR_ANALYST` and `STRATEGIC_RESEARCH_ANALYST`, then execute the generated `SEMANTIC_VIEW(...)` SQL directly on Snowflake.
 - **`CONTENT_AGENT`**: Executes parameterized Snowflake SQL against `SUPPORT_TICKETS` for keyword/customer matching, CSAT averages, priority counts, and category breakdowns.
-- **`supervisor_node`**: Creates a structured multi-step plan, routes dynamically via LangGraph `Command(goto=...)`, propagates context across steps, and synthesizes a final executive markdown brief.
+- **`supervisor_node`**: Creates a structured multi-step plan with a deterministic Python planner (term matching, no LLM; unmatched questions fall back to `DATA_ANALYST_AGENT` and are tagged `planner_fallback`), routes dynamically via LangGraph `Command(goto=...)`, propagates context across steps, and synthesizes a final executive markdown brief.
 
-### Structural & Trial-Org Insights (from Code + Knowledge Graph Trace)
-- **Trial-Org Adaptation**: Unpaid Snowflake trial accounts restrict `AI_COMPLETE`, `AI_EMBED`/`EMBED_TEXT_*` (Cortex Search), Cortex Inference (`403`), and the Cortex Agent `:run` endpoint (`399504`), while new accounts also block legacy `SNOWFLAKE.CORTEX.COMPLETE` (`399270`). Because **Semantic Views and Cortex Analyst REST text-to-SQL run natively on trial accounts**, `studio_app.py` pairs live Cortex Analyst + parameterized SQL today—while keeping `SNOWFLAKE_USE_CORTEX_AGENTS=true` as the upgrade path for full Cortex accounts (after `sql/02` and `sql/04` succeed; untested on the trial org).
+### Structural & Trial-Org Insights
+- **Trial-Org Adaptation**: Unpaid Snowflake trial accounts restrict `AI_COMPLETE`, `AI_EMBED`/`EMBED_TEXT_*` (Cortex Search), Cortex Inference (`403`), and the Cortex Agent `:run` endpoint (`399504`), while new accounts also block legacy `SNOWFLAKE.CORTEX.COMPLETE` (`399270`). Because **Semantic Views and Cortex Analyst REST text-to-SQL run natively on trial accounts**, the app pairs live Cortex Analyst + parameterized SQL today—while keeping `SNOWFLAKE_USE_CORTEX_AGENTS=true` as the upgrade path for full Cortex accounts (after `sql/02` and `sql/04` succeed; untested on the trial org).
 - **Dual Observability Stack (`LangSmith` + `Snowflake` + `TruLens`)**:
   - **LangSmith Nested Waterfall**: `@traceable` spans wrap `cortex_analyst_text_to_sql` (`llm`), `snowflake_support_tickets_search` (`retriever`), and `snowflake_sql_execute` (`tool`), logging `sfqid`, Cortex Analyst `request_id`, row counts, SQL latency, and deterministic feedback scores (`execution_success`, `non_empty_results`, `zero_errors`, `step_count`).
   - **Snowflake Telemetry View (`AGENT_OBSERVABILITY_LOGS`)**: Every SQL query emits a structured JSON `QUERY_TAG` (`app`, `trace_id`, `agent`, `step`, `tool`), queried live via `CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS` (`sql/06_setup_observability_view.sql`) for two-way trace ↔ Snowsight correlation.
@@ -51,26 +51,27 @@ flowchart LR
 
 ## 2. Demo Talk Track (2–3 Minutes)
 
-### Opening — The Problem (20 sec)
-> "Executives rarely ask single-table questions—they ask cross-domain questions like *'Who is complaining about our API, and how much revenue is at risk?'* Answering that requires unstructured support ticket analysis, behavioral churn metrics, and strategic revenue context. Here, we use **LangGraph** as an orchestrating supervisor over **Snowflake** data and **Cortex Analyst Semantic Views**, with **LangSmith Studio** providing step-by-step trace visibility."
+Order: show the result first, explain it second, prove it third. The full step-by-step version is in `DEMO_SCRIPT.md`.
 
-### Step 1 — Architecture, State Contract & Semantic Governance (30 sec)
-*(Show the graph topology in LangSmith Studio)*
-> "In LangSmith Studio you can see our hub-and-spoke `StateGraph`: a central `supervisor` node coordinating three domain specialists—`CONTENT_AGENT` for support tickets, `DATA_ANALYST_AGENT` for usage and churn behavior, and `RESEARCH_AGENT` for MRR and industry CLV. Every hop shares a typed `State` contract—our most connected abstraction in the codebase—storing an immutable plan, step index, and aggregated outputs so there are no wasted LLM routing calls. In Snowflake `CUSTOMER_INTELLIGENCE_DB.PUBLIC`, our tables sit behind governed `SEMANTIC VIEW` definitions so Cortex Analyst generates accurate, repeatable SQL without guessing joins or KPI definitions."
-
-### Step 2 — Live Run #1: Single-Agent Strategic Query (40 sec)
-*(Prompt to run in Studio: `"What industries have the highest total MRR and average customer lifetime?"`)*
-> "When we ask a strategic revenue question, the `supervisor` builds an execution plan and routes straight to `RESEARCH_AGENT`—no unnecessary hops. `RESEARCH_AGENT` calls Snowflake's Cortex Analyst REST API against `STRATEGIC_RESEARCH_ANALYST`, generates the `SEMANTIC_VIEW` SQL, and executes it live on `SNOWFLAKE_LEARNING_WH`. We immediately see Healthcare ($423,966.55 MRR), Finance ($405,595.52), and Education ($397,174.61) leading, with ~1,271+ days average customer lifetime."
-
-### Step 3 — Live Run #2: Multi-Agent Chained Query (60 sec)
-*(Prompt to run in Studio: `"Find customers complaining about API issues and analyze their churn rate and monthly revenue"`)*
-> "Now watch a cross-domain question. The `supervisor` plans a 3-step pipeline:
+### Cold Open — The Hard Question, Live (60 sec)
+*(No intro slide. Prompt to run in Studio: `"Find customers complaining about API issues and analyze their churn rate and monthly revenue"`)*
+> "Leaders don't ask single-table questions. They ask this." *(paste, submit, let the first node light up)*
 > 1. **`CONTENT_AGENT`** searches `SUPPORT_TICKETS` and isolates `502` API-related tickets across `461` customers (`264` `technical_issue`, `238` `integration_help`, average CSAT `3.03`, `132` high or urgent).
-> 2. **`DATA_ANALYST_AGENT`** queries `CUSTOMER_BEHAVIOR_ANALYST` via Cortex Analyst, joining ticketed customers with `CUSTOMERS` to find `1,452` customers in those categories, `110` churned—a `7.58%` churn rate.
-> 3. **`RESEARCH_AGENT`** queries `STRATEGIC_RESEARCH_ANALYST` to quantify financial exposure: `$405.89` average MRR and `$589,348.85` total monthly revenue across those same `1,452` customers (customers who filed `technical_issue` or `integration_help` tickets, not only the `461` who mention the API)—all traced end-to-end in LangSmith."
+> 2. **`DATA_ANALYST_AGENT`** queries `CUSTOMER_BEHAVIOR_ANALYST` via Cortex Analyst and finds `1,452` customers in those ticket categories, `110` churned—a `7.58%` churn rate.
+> 3. **`RESEARCH_AGENT`** queries `STRATEGIC_RESEARCH_ANALYST` to quantify financial exposure: `$405.89` average MRR and `$589,348.85` total monthly revenue across those same `1,452` customers (customers who filed `technical_issue` or `integration_help` tickets, not only the `461` who mention the API).
+>
+> "Three data domains, one executive brief, and the SQL for each step is traceable."
 
-### Closing — Production & Observability Path (25 sec)
-> "Everything runs live against our Snowflake trial org today via Cortex Analyst and Semantic Views, with **LangSmith Studio** capturing every state transition in real time. When promoted to a production Snowflake account, running `sql/02` and `sql/04` and setting `SNOWFLAKE_USE_CORTEX_AGENTS=true` swaps in Snowflake-managed Cortex Agents, Cortex Search vector indexes, and AI SQL UDFs—and unlocks **TruLens** (`trulens-apps-langgraph`) alongside LangSmith for automated Cortex evaluation, with a clean path to modularize `studio_app.py` into shared Snowflake client and supervisor modules."
+### What You Just Saw — Architecture & the Trade-Off (40 sec)
+*(Same Studio canvas, the finished run still highlighted)*
+> "This is a hub-and-spoke `StateGraph`: one `supervisor` plans once, routes step by step, and writes the brief. Three specialists share one typed `State` contract and read Snowflake data behind governed `SEMANTIC VIEW` definitions, so Cortex Analyst generates repeatable SQL without guessing joins or KPI definitions. The planner is deterministic Python, not an LLM. That was a deliberate choice: this trial account blocks `AI_COMPLETE`, so the LLM runs only where it earns its cost—text-to-SQL—and routing is repeatable, free, and covered by an offline unit-test suite."
+
+### Proof — Same Run, Two Systems (40 sec)
+*(Split screen: LangSmith waterfall on the left, Snowsight chart of `AGENT_OBSERVABILITY_LOGS` for the same trace ID on the right)*
+> "Most agent demos stop at the left side. On the right is Snowflake's own query history for the same run: the agent's SQL statements as bars on the right. Every LangSmith SQL span carries the Snowflake query ID, and every SQL statement the agent runs carries a `QUERY_TAG` with the LangSmith trace ID. Text-to-SQL time lives on the LangSmith side, while a platform team can check SQL time and rows per step from inside Snowflake."
+
+### Closing — Production Path (20 sec)
+> "Everything you saw ran live on a Snowflake trial account. Offline evals in LangSmith (`route_match`, `sql_executed_with_rows`, `eval_zero_errors`) guard every change to a Semantic View or a planner rule. On a full account, running `sql/02` and `sql/04` and setting `SNOWFLAKE_USE_CORTEX_AGENTS=true` swaps in Snowflake-managed Cortex Agents and Cortex Search on the same graph. That mode is written and not yet tested, because the trial blocks it."
 
 ---
 

@@ -1,62 +1,132 @@
 # Live Demo Script: Multi-Agent Customer Intelligence with Snowflake & LangGraph
 
-**Total Runtime:** ~8 minutes (can be trimmed to 4 minutes by skipping Act 1's Knowledge Graph visual and running only Act 3 + Act 4)
+**Total Runtime:** ~8 minutes. For a 4-minute cut, run only Act 1 (cold open) and Act 3 (split screen).
+
+**Story shape:** show the result first, explain it second, prove it third.
+
+| Act | What the audience sees | Time |
+| --- | --- | --- |
+| 1 | Cold open: one hard question, three agents light up live | ~2 min |
+| 2 | "What you just saw": the architecture, on the same canvas | ~1 min |
+| 3 | Split screen: LangSmith waterfall next to a Snowflake chart of the same run | ~2 min |
+| 4 | Contrast: a simple question takes one hop, not three | ~1 min |
+| 5 | Evals and the production upgrade path | ~1.5 min |
 
 ---
 
-## Pre-Flight Checklist (2 Minutes Before Demo)
+## Pre-Flight Checklist (10 Minutes Before Demo)
 
-1. **Verify the LangGraph dev server is running** (`http://127.0.0.1:2024`):
+1. **Check the Snowflake login still works.** The login uses a Programmatic Access Token (PAT). Run:
+   ```bash
+   .venv/bin/python studio_app.py
+   # Expected: two answers printed, exit code 0
+   ```
+   If you see `Network policy is required`, the token can no longer log in from this network. Fix it in Snowsight before the demo (see the troubleshooting card).
+
+2. **Start the LangGraph dev server.** It is not left running. Start it from `/Users/yourbabes/dev/SnowLearn/SnowLangGraph` in a terminal that stays open for the whole demo:
+   ```bash
+   .venv/bin/langgraph dev --allow-blocking --no-browser
+   ```
+   Then check it:
    ```bash
    curl -s http://127.0.0.1:2024/ok
    # Expected: {"ok":true}
    ```
-   If it's not running, start it from `/Users/yourbabes/dev/SnowLearn/SnowLangGraph`:
-   ```bash
-   .venv/bin/langgraph dev --allow-blocking --no-browser
-   ```
 
-2. **Open 4 browser tabs side-by-side**:
+3. **Open 3 browser tabs**:
    - **Tab 1 — LangSmith Studio**: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024` (select graph `supervisor_workflow`)
-   - **Tab 2 — LangSmith Experiments**: `https://smith.langchain.com/o/4c3b325e-7b1a-496e-9bb2-de5ce01d7097/datasets/0e556ec0-f5fc-4fb2-a1fc-725af7df428c/compare?selectedSessions=4e0d49d1-0613-4597-8e90-14495be4dd67`
-   - **Tab 3 — Snowsight SQL Worksheet** (logged into your Snowflake account as `ACCOUNTADMIN`, warehouse `SNOWFLAKE_LEARNING_WH`, schema `CUSTOMER_INTELLIGENCE_DB.PUBLIC`)
+   - **Tab 2 — LangSmith Experiments** (latest run `snowlanggraph-trial-c05502ee`): `https://smith.langchain.com/o/4c3b325e-7b1a-496e-9bb2-de5ce01d7097/datasets/0e556ec0-f5fc-4fb2-a1fc-725af7df428c/compare?selectedSessions=9b29a555-a29e-4819-838a-43832c62973f`
+   - **Tab 3 — Snowsight SQL Worksheet** (role `ACCOUNTADMIN`, warehouse `SNOWFLAKE_LEARNING_WH`, schema `CUSTOMER_INTELLIGENCE_DB.PUBLIC`)
 
-3. **Pre-stage this SQL snippet in Tab 3 (Snowsight)**:
+4. **Set up the split screen for Act 3.** Drag Tab 3 (Snowsight) into its own window. Snap Tab 1 to the left half of the screen and Snowsight to the right half. Zoom both to about 125% so the back of the room can read them.
+
+5. **Pre-stage the chart query in Tab 3 (Snowsight)**:
    ```sql
+   -- One bar per agent step for one LangSmith trace
    SELECT
-       QUERY_ID,
-       LANGSMITH_TRACE_ID,
-       AGENT_NAME,
-       STEP_NUMBER,
-       TOOL_NAME,
-       EXECUTION_STATUS,
-       ELAPSED_MS,
-       ROWS_PRODUCED,
-       LEFT(QUERY_TEXT, 120) AS SQL_PREVIEW
+       TO_VARCHAR(STEP_NUMBER) || ' - ' || AGENT_NAME AS STEP_LABEL,
+       COUNT(*)            AS QUERIES,
+       SUM(ELAPSED_MS)     AS TOTAL_MS,
+       SUM(ROWS_PRODUCED)  AS ROWS_OUT
    FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS
-   LIMIT 20;
+   WHERE LANGSMITH_TRACE_ID = '<paste_trace_id>'
+   GROUP BY STEP_NUMBER, AGENT_NAME
+   ORDER BY STEP_NUMBER;
    ```
 
----
-
-## Act 1: The Problem & Architecture (~1 min)
-
-**Screen:** Tab 1 (LangSmith Studio graph canvas) → briefly switch to Tab 4 (`graph.html`) if showing codebase structure.
-
-**Say:**
-> "Business leaders don't ask single-table questions—they ask cross-domain questions like *'Who is complaining about our API, and how much revenue is at risk?'* That spans unstructured support tickets, behavioral churn metrics, and financial exposure.
->
-> What you're looking at in **LangSmith Studio** is a hub-and-spoke `LangGraph` `StateGraph` (`supervisor_workflow` in `studio_app.py`):
-> - A central **`supervisor`** node that builds an execution plan once, routes step-by-step, and synthesizes the final brief.
-> - Three specialists: **`CONTENT_AGENT`** (support tickets), **`DATA_ANALYST_AGENT`** (usage & churn), and **`RESEARCH_AGENT`** (MRR, customer lifetime, and industry trends).
->
-> All three share a single typed `State` contract—so there are no repeated LLM routing loops—and talk to live data in Snowflake `CUSTOMER_INTELLIGENCE_DB.PUBLIC`: `10,000` customers, `101,711` usage events, `8,954` support tickets, and `703` churn events, modeled behind two governed **Snowflake Semantic Views** (`CUSTOMER_BEHAVIOR_ANALYST` and `STRATEGIC_RESEARCH_ANALYST`)."
+6. **Rehearse the chart once.** Run the cold-open question in Studio, paste its trace id into the query, run it, then click **Chart** in the results pane. Set chart type **Bar**, X-axis `STEP_LABEL`, value `TOTAL_MS` or `ROWS_OUT` (pick whichever draws readable bars). Leave that worksheet open so the chart settings stay in place. Check that the bars draw again after a second run. This run also warms the warehouse.
 
 ---
 
-## Act 2: Single-Agent Strategic Query (~1.5 min)
+## Act 1: Cold Open — The Hard Question, Live (~2 min)
 
-**Screen:** Tab 1 (LangSmith Studio — new thread).
+**Screen:** Tab 1 (LangSmith Studio — new thread), full width. No slides. No architecture talk yet.
+
+**Say (one sentence, then paste):**
+> "Leaders don't ask single-table questions. They ask this."
+
+**Action:** Paste and submit:
+```text
+Find customers complaining about API issues and analyze their churn rate and monthly revenue
+```
+
+**Narrate while each node lights up on the canvas (do not talk over the first one — let them watch it):**
+1. **`CONTENT_AGENT`** lights up: "First it reads the support tickets." → `502` API-related tickets across `461` customers (`264` `technical_issue`, `238` `integration_help`, average CSAT `3.03`, `132` high or urgent).
+2. **`DATA_ANALYST_AGENT`** lights up: "Then it asks Snowflake Cortex Analyst about churn." → `1,452` customers with technical or integration tickets, `110` churned (`7.58%` churn rate).
+3. **`RESEARCH_AGENT`** lights up: "Then it puts a dollar figure on it." → `$405.89` average MRR and `$589,348.85` total monthly revenue for the same `1,452` customers.
+
+Say the money figure as "customers with technical or integration tickets". The analysts work on ticket categories, not only on the `461` customers who mention the API.
+
+**Land the open (scroll to the final brief):**
+> "Three data domains, three specialists, one executive brief, and the SQL for each step is traceable. Now let me show you what you just watched."
+
+---
+
+## Act 2: "What You Just Saw" — Architecture & the Trade-Off (~1 min)
+
+**Screen:** Tab 1, same canvas, the finished run still highlighted.
+
+**Say (point at the nodes that just ran):**
+> "This is a hub-and-spoke LangGraph `StateGraph`. One **`supervisor`** plans once, routes step by step, and writes the final brief. Three specialists do the work: **`CONTENT_AGENT`** on support tickets, **`DATA_ANALYST_AGENT`** on usage and churn, **`RESEARCH_AGENT`** on revenue and lifetime. They share one typed `State` contract, and they read live Snowflake data—`10,000` customers, `8,954` tickets—behind two governed **Semantic Views**.
+>
+> Here is the design decision I want to call out. The planner is not an LLM. It is deterministic Python: it matches question terms to agents. I chose that on purpose. This is a Snowflake trial account, and it blocks `AI_COMPLETE`. So I put the LLM only where it earns its cost—Cortex Analyst turning English into governed SQL—and kept routing deterministic. The result: the same question takes the same route every time, routing costs zero tokens, and I can test it with an offline unit-test suite and no Snowflake login."
+
+**If asked "what about questions the rules miss?":**
+> "Unmatched questions fall back to the data analyst, and the trace is tagged `planner_fallback`, so I can count misses in LangSmith. On a full account, the same graph swaps the workers for Snowflake-managed Cortex Agents with one environment flag. That mode is written but untested on this trial."
+
+---
+
+## Act 3: Same Run, Two Systems — Split Screen (~2 min)
+
+**Screen:** Split. **Left half:** LangSmith trace of the Act 1 run. **Right half:** Snowsight worksheet with the staged chart query.
+
+**Left (LangSmith):**
+1. In Studio, click the trace link for the Act 1 run. Expand the waterfall: `supervisor` → three agents → **`cortex_analyst_text_to_sql`** (`llm`) and **`snowflake_support_tickets_search`** (`retriever`) → **`snowflake_sql_execute`** (`tool`).
+2. Click one `snowflake_sql_execute` span. Point at `snowflake_query_id` and `snowflake_query_tag` in its metadata.
+3. Click the **Feedback** tab on the root run: `execution_success: 1.0`, `non_empty_results: 1.0`, `zero_errors: 1.0`, `step_count: 3.0`.
+4. Copy the **trace ID**. Say: "I am copying this ID out of LangSmith."
+
+**Right (Snowsight):**
+5. Paste the trace ID into the staged query. Say: "And pasting it into Snowflake." Run it.
+6. Click **Chart**. Expect **5 bars** grouped by 3 agents (tested live 2026-11-17): `CONTENT_AGENT` has 3 (`SUPPORT_TICKETS_SUMMARY` ~106 ms, `SUPPORT_TICKETS_BREAKDOWN` ~613 ms, `SUPPORT_TICKETS_SAMPLES` ~31 ms), `DATA_ANALYST_AGENT` has 1 (~44 ms), `RESEARCH_AGENT` has 1 (~253 ms). Timings vary per run, so do not quote them. The Cortex Analyst REST call itself is not tagged. Only the SQL it produces is, and that is what you see.
+
+**Say (gesture left, then right):**
+> "Most agent demos stop on the left. You see node timings, and the database is a black box. On the right is Snowflake's own query history for the same run—steps on the left, bars on the right. The link is two-way: every LangSmith SQL span carries the Snowflake query ID, and every SQL statement the agent runs carries a `QUERY_TAG` with the LangSmith trace ID. The tag is sent per statement, so concurrent users on one shared session never mix their tags. Text-to-SQL time lives on the LangSmith side, while a platform team can now check SQL time and rows per step, from inside Snowflake, with no access to LangSmith."
+
+**Optional drill-down (if someone asks to see the rows):**
+```sql
+SELECT QUERY_ID, AGENT_NAME, STEP_NUMBER, TOOL_NAME, EXECUTION_STATUS,
+       ELAPSED_MS, ROWS_PRODUCED, LEFT(QUERY_TEXT, 120) AS SQL_PREVIEW
+FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS
+WHERE LANGSMITH_TRACE_ID = '<paste_trace_id>'
+ORDER BY STEP_NUMBER, START_TIME;
+```
+
+---
+
+## Act 4: Contrast — A Simple Question Takes One Hop (~1 min)
+
+**Screen:** Tab 1 full width again (LangSmith Studio — new thread). Cut this act first if time is short.
 
 **Action:** Paste and submit:
 ```text
@@ -64,91 +134,29 @@ What industries have the highest total MRR and average customer lifetime?
 ```
 
 **Watch & Point Out:**
-1. On the graph canvas, `supervisor` routes directly to **`RESEARCH_AGENT`** (1 step only—skips `CONTENT_AGENT` and `DATA_ANALYST_AGENT`), then back to `supervisor`, then `END`.
-2. Scroll the final output to show:
-   - **Cortex Analyst's interpretation** and **generated `SEMANTIC_VIEW` / SQL** against `STRATEGIC_RESEARCH_ANALYST`.
-   - **Live Snowflake table** (`healthcare` at `$423,966.55` MRR, `finance` at `$405,595.52`, `education` at `$397,174.61`, ~`1,271+` days avg lifetime).
-   - **Observability Telemetry footer** at the bottom (`LangSmith Trace ID` + Snowflake `sfqid`).
+1. Only **`RESEARCH_AGENT`** lights up. The other two stay dark.
+2. The final output shows Cortex Analyst's interpretation, the generated `SEMANTIC_VIEW` SQL, and the live table (`healthcare` at `$423,966.55` MRR, `finance` at `$405,595.52`, `education` at `$397,174.61`, ~`1,271+` days average lifetime).
 
 **Say:**
-> "Notice two things here. First, the supervisor didn't waste calls on irrelevant agents—it planned a 1-step route straight to `RESEARCH_AGENT`. Second, we're running on a Snowflake trial account where `AI_COMPLETE` and `Cortex Search` are gated, yet **Snowflake Semantic Views and the Cortex Analyst REST API work natively**. Cortex Analyst translated English into governed SQL and executed it live on `SNOWFLAKE_LEARNING_WH`."
-
----
-
-## Act 3: Multi-Agent Chained Query (~2 min)
-
-**Screen:** Tab 1 (LangSmith Studio — new thread).
-
-**Action:** Paste and submit:
-```text
-Find customers complaining about API issues and analyze their churn rate and monthly revenue
-```
-
-**Watch & Point Out (as each node lights up):**
-1. **`CONTENT_AGENT`**: Queries `SUPPORT_TICKETS` via parameterized SQL → isolates `502` API-related tickets across `461` customers (`264` `technical_issue`, `238` `integration_help`, average CSAT `3.03`, `132` high or urgent tickets).
-2. **`DATA_ANALYST_AGENT`**: Calls Cortex Analyst (`CUSTOMER_BEHAVIOR_ANALYST`) → joins ticketed categories (`technical_issue`, `integration_help`) with `CUSTOMERS` → returns `1,452` customers, `110` churned (`7.58%` churn rate).
-3. **`RESEARCH_AGENT`**: Calls Cortex Analyst (`STRATEGIC_RESEARCH_ANALYST`) → quantifies financial exposure for the same `1,452` customers: `$405.89` avg MRR and `$589,348.85` total monthly revenue. Say it as "customers with technical or integration tickets". The analyst works on ticket categories, not on the `461` customers who mention the API.
-
-**Say:**
-> "Now watch a cross-domain question. The supervisor builds a 3-step pipeline: `CONTENT_AGENT` isolates the complaint cohort in `SUPPORT_TICKETS`, `DATA_ANALYST_AGENT` joins those categories with customer status via `CUSTOMER_BEHAVIOR_ANALYST` to surface a `7.58%` churn rate, and `RESEARCH_AGENT` quantifies `$589,348.85` in monthly recurring revenue exposure—synthesized into one executive brief with every query ID attached."
-
----
-
-## Act 4: End-to-End Observability — LangSmith ↔ Snowflake Correlation (~2 min)
-
-**Screen:** Tab 1 → click the **View in LangSmith** / trace link on the run you just executed, then switch to Tab 3 (Snowsight).
-
-**Actions in LangSmith Trace View:**
-1. Expand the waterfall: `supervisor` → `CONTENT_AGENT` / `DATA_ANALYST_AGENT` / `RESEARCH_AGENT` → **`cortex_analyst_text_to_sql`** (`llm`) & **`snowflake_support_tickets_search`** (`retriever`) → **`snowflake_sql_execute`** (`tool`).
-2. Click a `snowflake_sql_execute` span and point out its metadata:
-   - `snowflake_query_id` (`sfqid`)
-   - `snowflake_query_tag` (JSON with `app`, `trace_id`, `agent`, `step`, `tool`)
-   - `elapsed_ms`, `row_count`, `warehouse`
-3. Click the **Feedback** tab on the root trace to show the automated online checks:
-   - `execution_success: 1.0`
-   - `non_empty_results: 1.0`
-   - `zero_errors: 1.0`
-   - `step_count: 3.0`
-4. Copy the **`LangSmith Trace ID`** from the telemetry footer (or trace header).
-
-**Actions in Tab 3 (Snowsight):**
-Run your staged query (or filter `WHERE LANGSMITH_TRACE_ID = '<paste_trace_id>'`):
-```sql
-SELECT
-    QUERY_ID,
-    LANGSMITH_TRACE_ID,
-    AGENT_NAME,
-    STEP_NUMBER,
-    TOOL_NAME,
-    EXECUTION_STATUS,
-    ELAPSED_MS,
-    ROWS_PRODUCED,
-    LEFT(QUERY_TEXT, 120) AS SQL_PREVIEW
-FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS
-WHERE LANGSMITH_TRACE_ID = '<paste_trace_id>'
-ORDER BY STEP_NUMBER;
-```
-
-**Say:**
-> "Most agent demos stop at LangSmith node timings, leaving database execution as a black box. Here we have **two-way correlation**: every child span in LangSmith carries the exact Snowflake `sfqid` and `request_id`, and every Snowflake query carries a structured `QUERY_TAG` with the `LANGSMITH_TRACE_ID`. In Snowsight's `AGENT_OBSERVABILITY_LOGS` view—built over `INFORMATION_SCHEMA.QUERY_HISTORY`—we can slice latency, bytes scanned, and rows produced per agent step, or click straight into Snowflake's Query Profile."
+> "Same graph, different question, one hop. The supervisor does not spend calls on agents it does not need. And the SQL you see came from a governed Semantic View, so the definition of MRR lives in Snowflake, not in a prompt."
 
 ---
 
 ## Act 5: Offline Evals & Production Upgrade Path (~1.5 min)
 
-**Screen:** Tab 2 (LangSmith Experiments) + terminal (optional live run).
+**Screen:** Tab 2 (LangSmith Experiments, `snowlanggraph-trial-c05502ee`) + terminal (optional live run).
 
 **Optional Live Command (takes ~35s):**
 ```bash
 .venv/bin/python evaluate_observability.py
 ```
 
-**Say (showing Tab 2 `snowlanggraph-trial-2f4a712d`):**
+**Say:**
 > "Evals sit at two points in this system:
-> 1. **Online feedback** watches every live request (`execution_success`, `non_empty_results`, `zero_errors`).
-> 2. **Offline regression evals** in `evaluate_observability.py` run `langsmith.evaluate()` against a golden dataset of single-agent and 3-agent prompts—checking `route_match`, `sql_executed_with_rows`, and `zero_errors`—plus `TruGraph` (`trulens-apps-langgraph`) OTEL recording.
+> 1. **Online feedback** scores every live request (`execution_success`, `non_empty_results`, `zero_errors`, `step_count`). You saw those in the trace.
+> 2. **Offline regression evals** in `evaluate_observability.py` run `langsmith.evaluate()` against a golden dataset of single-agent and 3-agent questions. They check `route_match`, `sql_executed_with_rows`, and `eval_zero_errors`, and record the run with TruLens `TruGraph`.
 >
-> Whenever we modify a Semantic View or planner rule, we re-run the suite to compare experiments side-by-side before shipping. And when moving from this trial org to a full Snowflake account, after you run `sql/02` and `sql/04` and set `SNOWFLAKE_USE_CORTEX_AGENTS=true`, the same graph uses Snowflake-managed Cortex Agents and Cortex Search vector indexes, and TruLens's Cortex-backed Agent GPA judges can run (untested on this trial org) (`Plan Quality`, `Plan Adherence`, `Execution Efficiency`, `Logical Consistency`) on the exact same LangGraph graph."
+> When I change a Semantic View or a planner rule, I re-run the suite and compare experiments side by side before shipping. On a full Snowflake account, after `sql/02` and `sql/04` run and `SNOWFLAKE_USE_CORTEX_AGENTS=true` is set, the same graph uses Snowflake-managed Cortex Agents and Cortex Search, and TruLens's Cortex-backed judges can score plan quality and adherence. I have not been able to test that mode on this trial account, and I say so in the handoff notes."
 
 ---
 
@@ -156,7 +164,10 @@ ORDER BY STEP_NUMBER;
 
 | Symptom | Fix |
 | --- | --- |
+| `Network policy is required` at Snowflake login | The user has no network policy allowing this IP (or any temporary PAT bypass window expired). In Snowsight or SQL, attach a network policy to the user (`ALTER USER <user> SET NETWORK_POLICY = <policy>`), or for a human user (`TYPE = PERSON`) add/modify a PAT with `MINS_TO_BYPASS_NETWORK_POLICY_REQUIREMENT = <1..1440>` and update `SNOWFLAKE_PASSWORD` in `.env`. Do this before the demo, not during it. |
 | LangSmith Studio won't connect | Verify server with `curl -s http://127.0.0.1:2024/ok`; restart via `.venv/bin/langgraph dev --allow-blocking --no-browser` |
-| Cold warehouse latency on first query | Expected `1–3s` as `SNOWFLAKE_LEARNING_WH` auto-resumes; run Act 2 once during pre-flight to warm it |
-| `AGENT_OBSERVABILITY_LOGS` shows old rows | Remember to filter by the latest `LANGSMITH_TRACE_ID` from the Studio telemetry footer (top `LIMIT 20` is newest-first) |
+| Every run fails with `OSError: [Errno 5]` | The terminal that started the dev server was closed. Restart the server in a terminal that stays open. |
+| Cold warehouse latency on first query | Expected `1–3s` as `SNOWFLAKE_LEARNING_WH` auto-resumes; the pre-flight rehearsal warms it |
+| Chart query returns no rows | Query history can lag a few seconds. Run it again. If the paste failed, replace the `WHERE` line with `WHERE LANGSMITH_TRACE_ID = (SELECT LANGSMITH_TRACE_ID FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS ORDER BY START_TIME DESC LIMIT 1)` to chart the newest run. |
+| Chart shows a table, not bars | Click **Chart**, set type **Bar**, X-axis `STEP_LABEL`, value `TOTAL_MS` or `ROWS_OUT` |
 | Need to reset / commit clean state | `.langgraph_api/` and `default.sqlite` are gitignored |

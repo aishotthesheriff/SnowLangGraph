@@ -14,6 +14,7 @@
     - `cryptography==46.0.0` (`<47`) so `pyOpenSSL==25.3.0` / `snowflake-connector-python==3.18.1` work alongside `langgraph-api==0.13.3` (`langgraph-cli[inmem]`).
 - **Environment File (`.env`, gitignored — DO NOT commit or print secrets):**
   - `SNOWFLAKE_ACCOUNT=<see local .env>`, `SNOWFLAKE_USER=<see local .env>`, `SNOWFLAKE_PASSWORD=<PAT>` (user attached Snowflake network policy), `SNOWFLAKE_WAREHOUSE=SNOWFLAKE_LEARNING_WH`, `SNOWFLAKE_ROLE=ACCOUNTADMIN`, `SNOWFLAKE_DATABASE=CUSTOMER_INTELLIGENCE_DB`, `SNOWFLAKE_SCHEMA=PUBLIC`, `LANGSMITH_API_KEY=<configured>`, `LANGSMITH_TRACING=true`.
+- **Snowflake login: WORKING again (checked 2026-11-17 01:00 PST).** It failed at 00:20 PST with `250001: Network policy is required`. It recovered with no change from us. The cause is unconfirmed. It may be the PAT's time-limited network-policy bypass. If it fails again, fix in Snowsight (new PAT, or a network policy on the user). Live smoke check and chart query both passed after the recovery.
 - **Dev Server: NOT running** (checked 2026-11-17; the old one on port 2024 had a dead terminal and failed every run). Start it: `.venv/bin/langgraph dev --allow-blocking --no-browser`. Then check `curl http://127.0.0.1:2024/ok` returns `{"ok":true}`.
   - Registered graph: `supervisor_workflow` (`langgraph.json` → `./studio_app.py:app`)
   - LangSmith Studio URL: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
@@ -51,7 +52,7 @@
     - `execute_snowflake_sql()` uses `df.collect(block=False)` to capture `sfqid` with zero extra round-trips and sends the QUERY_TAG with each statement (statement parameter; never changes the session) (`{"app": "snowlanggraph", "trace_id", "agent", "step", "tool"}`, reset in `finally`).
     - `emit_langsmith_feedback()` sends `execution_success`, `non_empty_results`, `zero_errors`, and `step_count` on synthesis.
 - **`evaluate_observability.py`**:
-  - Runs LangSmith dataset evals (`SnowLangGraph Customer Intelligence Eval`, experiment `snowlanggraph-trial-2f4a712d`), TruLens `TruGraph` OTEL recording (`default.sqlite`, gitignored), and queries `AGENT_OBSERVABILITY_LOGS`.
+  - Runs LangSmith dataset evals (`SnowLangGraph Customer Intelligence Eval`, latest experiment `snowlanggraph-trial-c05502ee`), TruLens `TruGraph` OTEL recording (`default.sqlite`, gitignored), and queries `AGENT_OBSERVABILITY_LOGS`.
   - *Verification note:* re-run on 2026-11-17 after the module split: exit 0, 4/4 routes correct, TruLens 1 record, audit view 10 rows.
 
 ---
