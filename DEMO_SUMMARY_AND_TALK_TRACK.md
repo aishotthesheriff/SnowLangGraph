@@ -14,7 +14,7 @@ We built and deployed a live **multi-agent customer intelligence system** orches
   - `USAGE_EVENTS` (`101,711` rows)
   - `SUPPORT_TICKETS` (`8,954` rows)
   - `CHURN_EVENTS` (`703` rows)
-  - Known limit: only `1,998` of the `10,000` customers have usage events (the upstream `data_generation.py` builds usage for the first `2,000` customers). Usage-based metrics cover about 20% of customers. Ticket, churn and revenue metrics cover all customers.
+  - Usage events cover `9,990` of the `10,000` customers (`508,637` rows). `10` customers signed up too recently to have usage. Backfilled on 2026-11-17 with `python data_generation.py --backfill-usage`. It only inserted rows, so the ticket, churn and revenue numbers did not change.
 - **2 Semantic Views** (`sql/03_setup_semantic_views.sql`):
   - `CUSTOMER_BEHAVIOR_ANALYST` (usage, engagement, satisfaction, churn)
   - `STRATEGIC_RESEARCH_ANALYST` (MRR, customer lifetime, industry segmentation, lost revenue)

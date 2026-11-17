@@ -100,7 +100,7 @@
 
 ## 7. Parked List Cleared 2026-11-17
 
-Done and tested: lazy session (`get_session()`, import needs no login), `studio_app.py` split into `supervisor.py` / `snowflake_client.py` / `observability.py`, QUERY_TAG sent per statement (two-thread live test: each query kept its own tag; no lock needed), `|` escaped in tables, `print()` replaced by `logging` (a broken-stdout test passes), 16 offline unit tests, intent and fallback tags on the `supervisor` span, evaluator key renamed `eval_zero_errors`, Act 3 wording fixed in the demo docs, the 20% usage-data limit written in the docs.
+Done and tested: lazy session (`get_session()`, import needs no login), `studio_app.py` split into `supervisor.py` / `snowflake_client.py` / `observability.py`, QUERY_TAG sent per statement (two-thread live test: each query kept its own tag; no lock needed), `|` escaped in tables, `print()` replaced by `logging` (a broken-stdout test passes), 16 offline unit tests, intent and fallback tags on the `supervisor` span, evaluator key renamed `eval_zero_errors`, Act 3 wording fixed in the demo docs, the usage-data limit written in the docs (since fixed: see section 8).
 
 Live checks after the split: `.venv/bin/python studio_app.py` exit 0 (same numbers: 502 / 461 / 132, 1,452 / 110); fresh `langgraph dev` two-question thread OK (each question re-planned, feedback on the root run); `evaluate_observability.py` exit 0.
 
@@ -110,3 +110,7 @@ Still open: reloading the data so usage events cover all customers (needs the ow
 - Five test traces named `snowflake_sql_execute` (input `SELECT 1`, agent `A`) sit in the LangSmith project `default`. An early version of the unit tests sent them. The tests now force tracing off (`test_tracing_is_off`). Delete the five runs in the LangSmith UI if you want a clean list.
 - The split renamed 7 helpers (dropped the leading underscore): `get_trace_ids`, `annotate_run_tree`, `emit_langsmith_feedback`, `execute_snowflake_sql`, `run_cortex_analyst`, `run_content_sql_search`, `format_rows_markdown`. No old name is left outside `graphify-out/` and `GRAPH_TRACE_ANALYSIS.md`.
 - A lock bug in managed mode (the lock was taken twice) was found in review and fixed (`RLock`). A test covers it. Managed mode itself is still untested live.
+
+## 8. Usage backfill (2026-11-17)
+
+`USAGE_EVENTS` had rows for only the first 2,000 customers (101,711 rows). Now it has `508,637` rows for `9,990` customers. Command: `.venv/bin/python data_generation.py --backfill-usage`. It only inserts, and it stops if the table is not the original load. The seed is fixed, so a full reload (`python data_generation.py`) gives the same rows. Build the rows before connecting, because opening the connection uses the random generator. Live smoke check after the backfill gives the same numbers: 502 / 461 / 132, 1,452 / 110 / $589,348.85. `data_generation.py` and the notebook now use the shared `get_session()`.

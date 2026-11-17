@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import random
-from langchain_snowflake import create_session_from_env
+from snowflake_client import get_session
 
 from dotenv import load_dotenv
 
@@ -18,38 +18,63 @@ load_dotenv()
 random.seed(42)
 np.random.seed(42)
 
+USAGE_HEAD = 2000  # The original load made usage events for only the first 2,000 customers.
+
+
+def build_data():
+    """Build every table's rows in memory. The random seed makes the result the same each run.
+
+    The head of the usage events (first 2,000 customers) is made first, so the
+    customers, tickets and churn rows stay identical to the original load.
+    The usage events for the other customers are made last for the same reason.
+    """
+    customers = generate_customers_data(10000)
+    usage_head = generate_usage_events(customers[:USAGE_HEAD])
+    tickets = generate_support_tickets(customers)
+    churn = generate_churn_events(customers)
+    usage_tail = generate_usage_events(customers[USAGE_HEAD:], start_id=len(usage_head) + 1)
+    return customers, usage_head, tickets, churn, usage_tail
+
+
+def backfill_usage():
+    """Add usage events for customers 2,001 and up. It only inserts. It deletes nothing."""
+    # Build the rows BEFORE opening the connection. Connecting uses the random
+    # generator, which would change the seeded result.
+    _, usage_head, _, _, usage_tail = build_data()
+    session = get_session()
+    existing = session.sql("SELECT COUNT(*) AS C FROM USAGE_EVENTS").collect()[0]["C"]
+    if existing != len(usage_head):
+        raise SystemExit(
+            f"USAGE_EVENTS has {existing} rows but the seeded head has {len(usage_head)}. "
+            "The table is not the original load. Stop, no rows were inserted."
+        )
+    insert_usage_events_data(session, usage_tail)
+    validate_data(session)
+
+
 def main():
     print("🚀 Starting Hour 1: Data Generation")
     print("=" * 50)
-    
-    # Initialize Snowflake session
-    session = create_session_from_env()
+
+    print("\n📊 Step 1: Generating Data (before connecting, so the seed stays the same)...")
+    customers, usage_head, tickets, churn, usage_tail = build_data()
+
+    session = get_session()
     print(f"✅ Connected to Snowflake: {session.get_current_database()}.{session.get_current_schema()}")
-    
-    # Step 1: Create Tables
-    print("\n📋 Step 1: Creating Tables...")
+
+    print("\n📋 Step 2: Creating Tables and Inserting...")
     create_tables(session)
-    
-    # Step 2: Generate and Insert Data
-    print("\n📊 Step 2: Generating Data...")
-    customers_data = generate_customers_data(10000)
-    insert_customers_data(session, customers_data)
-    
-    usage_events_data = generate_usage_events(customers_data[:2000])  # Subset for speed
-    insert_usage_events_data(session, usage_events_data)
-    
-    support_tickets_data = generate_support_tickets(customers_data)
-    insert_support_tickets_data(session, support_tickets_data)
-    
-    churn_events_data = generate_churn_events(customers_data)
-    insert_churn_events_data(session, churn_events_data)
-    
-    # Step 3: Validate Data
+    insert_customers_data(session, customers)
+    insert_usage_events_data(session, usage_head + usage_tail)
+    insert_support_tickets_data(session, tickets)
+    insert_churn_events_data(session, churn)
+
     print("\n🔍 Step 3: Validating Data...")
     validate_data(session)
-    
+
     print("\n✅ Hour 1 Complete!")
     print("🎯 Ready for Hour 2: Custom UDFs")
+
 
 def create_tables(session):
     """Create the 4 core tables."""
@@ -187,7 +212,7 @@ def generate_customers_data(num_customers=10000):
     print(f"✅ Generated {len(customers)} customer records")
     return customers
 
-def generate_usage_events(customers_data, events_per_customer_avg=50):
+def generate_usage_events(customers_data, events_per_customer_avg=50, start_id=1):
     """Generate realistic usage events."""
     
     features = [
@@ -204,7 +229,7 @@ def generate_usage_events(customers_data, events_per_customer_avg=50):
     }
     
     usage_events = []
-    event_counter = 1
+    event_counter = start_id
     
     for customer in customers_data:
         customer_id = customer['customer_id']
@@ -656,4 +681,9 @@ def validate_data(session):
         print(f"   {row['CHURN_REASON']}: {row['COUNT']} customers")
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if "--backfill-usage" in sys.argv:
+        backfill_usage()
+    else:
+        main()
