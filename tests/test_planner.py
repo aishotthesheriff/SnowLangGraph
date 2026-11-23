@@ -44,19 +44,20 @@ class ImportIsOffline(unittest.TestCase):
 
 
 class PlannerRoutes(unittest.TestCase):
-    # These four questions and routes are the evaluation set in evaluate_observability.py.
+    # All 12 evaluation questions in evaluate_observability.py plus the Act 4B demo prompt.
     def test_eval_routes(self):
-        cases = {
-            "What industries have the highest total MRR and average customer lifetime?": ["RESEARCH_AGENT"],
-            "How many customers are in each plan type and what is their churn rate?": ["DATA_ANALYST_AGENT"],
-            "Show customer feedback and support tickets about billing": ["CONTENT_AGENT"],
-            "Find customers complaining about API issues and analyze their churn rate and monthly revenue": [
-                "CONTENT_AGENT", "DATA_ANALYST_AGENT", "RESEARCH_AGENT",
-            ],
-        }
-        for question, expected in cases.items():
+        import evaluate_observability as eo
+
+        self.assertEqual(len(eo.EVAL_EXAMPLES), 12)
+        for ex in eo.EVAL_EXAMPLES:
+            question = ex["inputs"]["question"]
+            expected = ex["outputs"]["expected_agents"]
             with self.subTest(question=question):
-                self.assertEqual(agents(question), expected)
+                plan = sup._build_trial_plan(question)
+                self.assertEqual([s["agent"] for s in plan["steps"]], expected)
+                self.assertEqual(plan["fallback"], question == "How many customers do we have in total?")
+
+        self.assertEqual(agents("How many urgent API support tickets are there?"), ["CONTENT_AGENT"])
 
     def test_word_start_matching_not_substring(self):
         self.assertNotIn("CONTENT_AGENT", agents("rapid growth overview"))  # 'rapid' contains 'api'

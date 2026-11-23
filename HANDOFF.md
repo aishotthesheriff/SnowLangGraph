@@ -1,8 +1,8 @@
 # Agent Handoff Brief — SnowLangGraph
 
-**Date:** 2026-11-16  
+**Date:** 2026-11-17  
 **Workspace:** `/Users/yourbabes/dev/SnowLearn/SnowLangGraph`  
-**Git Branch / HEAD:** `main` @ `0d17816` (with uncommitted docs, and GitNexus files—see §5)
+**Git Branch / HEAD:** `main` @ `f77dfad` (plus `start_demo.sh` and `DEMO_DECK.html`)
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### Active & Verified
 - **`CUSTOMER_INTELLIGENCE_DB.PUBLIC`**:
-  - Tables loaded from local CSVs: `CUSTOMERS` (`10,000` rows), `USAGE_EVENTS` (`101,711` rows), `SUPPORT_TICKETS` (`8,954` rows), `CHURN_EVENTS` (`703` rows).
+  - Tables loaded from local CSVs: `CUSTOMERS` (`10,000` rows), `USAGE_EVENTS` (`508,637` rows across `9,990` customers; backfilled from `101,711`), `SUPPORT_TICKETS` (`8,954` rows), `CHURN_EVENTS` (`703` rows).
   - Semantic Views (`sql/03_setup_semantic_views.sql`): `CUSTOMER_BEHAVIOR_ANALYST`, `STRATEGIC_RESEARCH_ANALYST`.
   - Telemetry View (`sql/06_setup_observability_view.sql`): `AGENT_OBSERVABILITY_LOGS` over `TABLE(CUSTOMER_INTELLIGENCE_DB.INFORMATION_SCHEMA.QUERY_HISTORY(RESULT_LIMIT => 10000))` (raised from 500 and applied in Snowflake).
 - **`SNOWFLAKE_INTELLIGENCE.AGENTS`**:
@@ -52,14 +52,16 @@
     - `execute_snowflake_sql()` uses `df.collect(block=False)` to capture `sfqid` with zero extra round-trips and sends the QUERY_TAG with each statement (statement parameter; never changes the session) (`{"app": "snowlanggraph", "trace_id", "agent", "step", "tool"}`, reset in `finally`).
     - `emit_langsmith_feedback()` sends `execution_success`, `non_empty_results`, `zero_errors`, and `step_count` on synthesis.
 - **`evaluate_observability.py`**:
-  - Runs LangSmith dataset evals (`SnowLangGraph Customer Intelligence Eval`, latest experiment `snowlanggraph-trial-c05502ee`), TruLens `TruGraph` OTEL recording (`default.sqlite`, gitignored), and queries `AGENT_OBSERVABILITY_LOGS`.
+  - Runs LangSmith dataset evals (`SnowLangGraph Customer Intelligence Eval`, 12-question experiment `snowlanggraph-trial-09f9954a`), TruLens `TruGraph` OTEL recording (`default.sqlite`, gitignored), and queries `AGENT_OBSERVABILITY_LOGS`.
   - *Verification note:* re-run on 2026-11-17 after the module split: exit 0, 4/4 routes correct, TruLens 1 record, audit view 10 rows.
 
 ---
 
 ## 4. Repo Artifacts, Knowledge Graph & Code Intelligence
 
-- **Documentation:**
+- **Documentation & Demo Assets:**
+  - `DEMO_DECK.html` — self-contained 13-slide HTML companion deck
+  - `start_demo.sh` — pre-flight test, server launcher, live warmup check, browser tab launcher, and interactive prompt queue
   - `DEMO_SUMMARY_AND_TALK_TRACK.md` — 1-page executive summary & talk track
   - `DEMO_SCRIPT.md` — 5-act step-by-step live demo runbook
   - `OBSERVABILITY_DATA_MODEL.md` — 4-layer trace storage schema (`State`, LangSmith, Snowflake `AGENT_OBSERVABILITY_LOGS`, TruLens `default.sqlite`)
@@ -117,7 +119,7 @@ Still open: reloading the data so usage events cover all customers (needs the ow
 
 ## 9. Bigger eval set (2026-11-17)
 
-`evaluate_observability.py` now has 12 questions (was 4). Experiment `snowlanggraph-trial-09f9954a`: 12 runs. `route_match`, `eval_zero_errors`, `execution_success` and `zero_errors` pass 12/12. `sql_executed_with_rows` and `non_empty_results` pass 11/12. The one miss is the CLV question (see `PARKED.md`). The demo docs still point to the older 4-question experiment `c05502ee`. That is fine for the demo.
+`evaluate_observability.py` now has 12 questions (was 4). Experiment `snowlanggraph-trial-09f9954a`: 12 runs. `route_match`, `eval_zero_errors`, `execution_success` and `zero_errors` pass 12/12. `sql_executed_with_rows` and `non_empty_results` pass 11/12. The one miss is the CLV question (see `PARKED.md`). `DEMO_SCRIPT.md` Tab 2 and `start_demo.sh` now point to `09f9954a`.
 
 ## 10. CLV metric (2026-11-17)
 
@@ -126,4 +128,8 @@ Added `CUSTOMER_LIFETIME_VALUE` (realized CLV of churned customers = final month
 ## 11. Known bad behavior kept on purpose (2026-11-17)
 
 `run_content_sql_search` ORs keywords and matches "urgent" in ticket text. Question "How many urgent API support tickets are there?" gives 729 tickets (642 customers, 186 high/urgent) and includes a password-reset ticket. It is demo Act 4B ("the trace caught bad behavior"). Do not fix it before the demo. Fix after: AND logic or the priority column, plus a relevance evaluator. Example run: `01a1e879-bea7-7405-b387-d60a92d65449` in the LangSmith `default` project.
+
+## 12. Demo Launcher, Companion Deck & PAT Bypass Note (2026-11-18)
+
+Added `start_demo.sh` (verified live on 2026-11-17 with `--check-only`: 18/18 tests, `/ok` healthy, 5-query warmup run `01a1eac5-7358-77eb-81ad-eaa6a2d141a9`) and `DEMO_DECK.html` (13-slide self-contained HTML companion deck, verified in headless Chrome at `1600x900`). On 2026-11-18 (>24h after the PAT was created/refreshed), Snowflake login returned `250001: Network policy is required` again because PAT `MINS_TO_BYPASS_NETWORK_POLICY_REQUIREMENT` expires after at most 1440 minutes (24 hours) when no network policy is attached to the user. Refresh the PAT or attach a network policy in Snowsight before running live demos.
 

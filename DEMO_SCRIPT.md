@@ -1,20 +1,23 @@
 # Live Demo Script: Multi-Agent Customer Intelligence with Snowflake & LangGraph
 
-**Total Runtime:** ~8 minutes. For a 4-minute cut, run only Act 1 (cold open) and Act 3 (split screen).
+**Total Runtime:** ~8.5 minutes (~10 minutes with optional Act 4B). For a 4-minute cut, run only Act 1 (cold open) and Act 3 (split screen).
 
-**Story shape:** show the result first, explain it second, prove it third.
+**Story shape:** show the result first, explain it second, prove it third. Companion deck: `DEMO_DECK.html`.
 
 | Act | What the audience sees | Time |
 | --- | --- | --- |
 | 1 | Cold open: one hard question, three agents light up live | ~2 min |
 | 2 | "What you just saw": the architecture, on the same canvas | ~1 min |
 | 3 | Split screen: LangSmith waterfall next to a Snowflake chart of the same run | ~2 min |
-| 4 | Contrast: a simple question takes one hop, not three | ~1 min |
+| 4 | One hop, and why a Semantic View (the CLV story) | ~2 min |
+| 4B (opt.) | The trace caught bad behavior: 729 "urgent API" tickets | ~1.5 min |
 | 5 | Evals and the production upgrade path | ~1.5 min |
 
 ---
 
 ## Pre-Flight Checklist (10 Minutes Before Demo)
+
+> **One-command launcher:** Run `./start_demo.sh` from `/Users/yourbabes/dev/SnowLearn/SnowLangGraph`. It runs the offline unit tests, starts `langgraph dev`, runs the live Act 1 warmup check against Snowflake (catching `250001`), opens the 4 browser tabs (`DEMO_DECK.html`, Studio, LangSmith Experiments, Snowsight), and queues the prompts onto your clipboard with an interactive terminal stepper. The manual steps below are what `./start_demo.sh` automates:
 
 1. **Check the Snowflake login still works.** The login uses a Programmatic Access Token (PAT). Run:
    ```bash
@@ -33,9 +36,10 @@
    # Expected: {"ok":true}
    ```
 
-3. **Open 3 browser tabs**:
+3. **Open 4 browser tabs**:
+   - **Tab 0 — Companion Slide Deck (optional)**: `DEMO_DECK.html` (`open DEMO_DECK.html`)
    - **Tab 1 — LangSmith Studio**: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024` (select graph `supervisor_workflow`)
-   - **Tab 2 — LangSmith Experiments** (latest run `snowlanggraph-trial-c05502ee`): `https://smith.langchain.com/o/4c3b325e-7b1a-496e-9bb2-de5ce01d7097/datasets/0e556ec0-f5fc-4fb2-a1fc-725af7df428c/compare?selectedSessions=9b29a555-a29e-4819-838a-43832c62973f`
+   - **Tab 2 — LangSmith Experiments** (12-question run `snowlanggraph-trial-09f9954a`): `https://smith.langchain.com/o/4c3b325e-7b1a-496e-9bb2-de5ce01d7097/datasets/0e556ec0-f5fc-4fb2-a1fc-725af7df428c/compare?selectedSessions=bf610abf-a4ab-4e0f-a5ca-b253b070e431`
    - **Tab 3 — Snowsight SQL Worksheet** (role `ACCOUNTADMIN`, warehouse `SNOWFLAKE_LEARNING_WH`, schema `CUSTOMER_INTELLIGENCE_DB.PUBLIC`)
 
 4. **Set up the split screen for Act 3.** Drag Tab 3 (Snowsight) into its own window. Snap Tab 1 to the left half of the screen and Snowsight to the right half. Zoom both to about 125% so the back of the room can read them.
@@ -60,7 +64,7 @@
 
 ## Act 1: Cold Open — The Hard Question, Live (~2 min)
 
-**Screen:** Tab 1 (LangSmith Studio — new thread), full width. No slides. No architecture talk yet.
+**Screen:** Tab 1 (LangSmith Studio — new thread), full width (or cue from Slide 2 of `DEMO_DECK.html`). No architecture talk yet.
 
 **Say (one sentence, then paste):**
 > "Leaders don't ask single-table questions. They ask this."
@@ -108,7 +112,7 @@ Say the money figure as "customers with technical or integration tickets". The a
 
 **Right (Snowsight):**
 5. Paste the trace ID into the staged query. Say: "And pasting it into Snowflake." Run it.
-6. Click **Chart**. Expect **5 bars** grouped by 3 agents (tested live 2026-11-17): `CONTENT_AGENT` has 3 (`SUPPORT_TICKETS_SUMMARY` ~106 ms, `SUPPORT_TICKETS_BREAKDOWN` ~613 ms, `SUPPORT_TICKETS_SAMPLES` ~31 ms), `DATA_ANALYST_AGENT` has 1 (~44 ms), `RESEARCH_AGENT` has 1 (~253 ms). Timings vary per run, so do not quote them. The Cortex Analyst REST call itself is not tagged. Only the SQL it produces is, and that is what you see.
+6. Click **Chart**. Expect **3 bars** (one per agent step, totaling **5 queries** across the 3 agents; verified live 2026-11-18): `1 - CONTENT_AGENT` has 3 queries (`SUPPORT_TICKETS_SUMMARY`, `SUPPORT_TICKETS_BREAKDOWN`, `SUPPORT_TICKETS_SAMPLES`), `2 - DATA_ANALYST_AGENT` has 1, and `3 - RESEARCH_AGENT` has 1. Timings vary per run, so do not quote them. The Cortex Analyst REST call itself is not tagged. Only the SQL it produces is, and that is what you see.
 
 **Say (gesture left, then right):**
 > "Most agent demos stop on the left. You see node timings, and the database is a black box. On the right is Snowflake's own query history for the same run—steps on the left, bars on the right. The link is two-way: every LangSmith SQL span carries the Snowflake query ID, and every SQL statement the agent runs carries a `QUERY_TAG` with the LangSmith trace ID. The tag is sent per statement, so concurrent users on one shared session never mix their tags. Text-to-SQL time lives on the LangSmith side, while a platform team can now check SQL time and rows per step, from inside Snowflake, with no access to LangSmith."
@@ -144,7 +148,7 @@ What industries have the highest total MRR and average customer lifetime?
 ```text
 What is the average customer lifetime value by industry?
 ```
-Point at the interpretation line: `realized CLV = average of final_monthly_revenue * days_since_signup / 30`. The top industry is `technology` at about `$5,000` (`retail` is next at about `$4,900`).
+Point at the interpretation line: `realized CLV = average of final_monthly_revenue * days_since_signup / 30`. Sorted descending, the top industries are `media` at about `$6,782` and `manufacturing` at about `$6,730` (`technology` is `$5,034`, `retail` is `$4,878`).
 
 **Say (this is the "why"):**
 > "Here is why I put a Semantic View between the agents and the data. Before I fixed it, I ran this exact question and the system did not guess. Cortex Analyst answered: 'customer lifetime value is not defined in the semantic model, and there are several valid ways to calculate it. Which one do you mean?' It wrote no SQL. In my evaluation that showed up as one failed run out of twelve—I did not hide it, I treated it as a finding.
@@ -186,7 +190,7 @@ Expect `729` matching tickets, `642` customers, `186` "urgent" (verified 2026-11
 
 ## Act 5: Offline Evals & Production Upgrade Path (~1.5 min)
 
-**Screen:** Tab 2 (LangSmith Experiments, `snowlanggraph-trial-c05502ee`) + terminal (optional live run).
+**Screen:** Tab 2 (LangSmith Experiments, `snowlanggraph-trial-09f9954a`) + terminal (optional live run).
 
 **Optional Live Command (takes ~35s):**
 ```bash

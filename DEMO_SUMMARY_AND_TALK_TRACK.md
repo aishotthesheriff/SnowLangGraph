@@ -11,10 +11,9 @@ We built and deployed a live **multi-agent customer intelligence system** orches
 ### Live Snowflake Assets (`CUSTOMER_INTELLIGENCE_DB.PUBLIC`)
 - **4 Core Tables Loaded**:
   - `CUSTOMERS` (`10,000` rows)
-  - `USAGE_EVENTS` (`101,711` rows)
+  - `USAGE_EVENTS` (`508,637` rows covering `9,990` of the `10,000` customers; `10` signed up too recently to have usage; backfilled from `101,711` on 2026-11-17 with `python data_generation.py --backfill-usage`, which only inserted rows so ticket, churn, and revenue numbers did not change)
   - `SUPPORT_TICKETS` (`8,954` rows)
   - `CHURN_EVENTS` (`703` rows)
-  - Usage events cover `9,990` of the `10,000` customers (`508,637` rows). `10` customers signed up too recently to have usage. Backfilled on 2026-11-17 with `python data_generation.py --backfill-usage`. It only inserted rows, so the ticket, churn and revenue numbers did not change.
 - **2 Semantic Views** (`sql/03_setup_semantic_views.sql`):
   - `CUSTOMER_BEHAVIOR_ANALYST` (usage, engagement, satisfaction, churn)
   - `STRATEGIC_RESEARCH_ANALYST` (MRR, customer lifetime, industry segmentation, lost revenue)
@@ -44,7 +43,7 @@ flowchart LR
 - **Dual Observability Stack (`LangSmith` + `Snowflake` + `TruLens`)**:
   - **LangSmith Nested Waterfall**: `@traceable` spans wrap `cortex_analyst_text_to_sql` (`llm`), `snowflake_support_tickets_search` (`retriever`), and `snowflake_sql_execute` (`tool`), logging `sfqid`, Cortex Analyst `request_id`, row counts, SQL latency, and deterministic feedback scores (`execution_success`, `non_empty_results`, `zero_errors`, `step_count`).
   - **Snowflake Telemetry View (`AGENT_OBSERVABILITY_LOGS`)**: Every SQL query emits a structured JSON `QUERY_TAG` (`app`, `trace_id`, `agent`, `step`, `tool`), queried live via `CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS` (`sql/06_setup_observability_view.sql`) for two-way trace ↔ Snowsight correlation.
-  - **LangSmith Evaluation & TruLens OTEL**: `evaluate_observability.py` runs `langsmith.evaluate(...)` across a 4-example dataset (`route_match`, `sql_executed_with_rows`, `eval_zero_errors`) plus `TruGraph` (`trulens-apps-langgraph`) OTEL recording (enabled by pinning `sqlalchemy<2.1`).
+  - **LangSmith Evaluation & TruLens OTEL**: `evaluate_observability.py` runs `langsmith.evaluate(...)` across a 12-example dataset (`route_match`, `sql_executed_with_rows`, `eval_zero_errors`) plus `TruGraph` (`trulens-apps-langgraph`) OTEL recording (enabled by pinning `sqlalchemy<2.1`).
 - **Modularization**: `studio_app.py` used to mix session/Snowflake logic with supervisor orchestration. It is now split into `supervisor.py`, `snowflake_client.py` and `observability.py`. `data_generation.py` and the notebook still have their own login code.
 
 ---
@@ -54,7 +53,7 @@ flowchart LR
 Order: show the result first, explain it second, prove it third. The full step-by-step version is in `DEMO_SCRIPT.md`.
 
 ### Cold Open — The Hard Question, Live (60 sec)
-*(No intro slide. Prompt to run in Studio: `"Find customers complaining about API issues and analyze their churn rate and monthly revenue"`)*
+*(Open cold in Studio, or cue from Slide 2 of `DEMO_DECK.html`. Prompt to run in Studio: `"Find customers complaining about API issues and analyze their churn rate and monthly revenue"`)*
 > "Leaders don't ask single-table questions. They ask this." *(paste, submit, let the first node light up)*
 > 1. **`CONTENT_AGENT`** searches `SUPPORT_TICKETS` and isolates `502` API-related tickets across `461` customers (`264` `technical_issue`, `238` `integration_help`, average CSAT `3.03`, `132` high or urgent).
 > 2. **`DATA_ANALYST_AGENT`** queries `CUSTOMER_BEHAVIOR_ANALYST` via Cortex Analyst and finds `1,452` customers in those ticket categories, `110` churned—a `7.58%` churn rate.
@@ -86,16 +85,23 @@ Order: show the result first, explain it second, prove it third. The full step-b
 ## 3. Quick Reference Commands & Artifacts
 
 ```bash
+# Start everything, verify live warmup, open tabs + DEMO_DECK.html, and queue prompts
+./start_demo.sh
+
+# Pre-flight verification only (starts server, runs live warmup, shuts down cleanly)
+./start_demo.sh --check-only
+
 # Run CLI verification tests
 .venv/bin/python studio_app.py
 
 # Run LangSmith eval + TruLens recording + Snowflake audit check
 .venv/bin/python evaluate_observability.py
 
-# Start LangGraph dev server + Studio API
+# Start LangGraph dev server + Studio API manually
 .venv/bin/langgraph dev --allow-blocking --no-browser
 ```
 
+- **Companion Slide Deck**: `DEMO_DECK.html` (`open DEMO_DECK.html`)
 - **Local API**: `http://127.0.0.1:2024` (`http://127.0.0.1:2024/docs`)
 - **LangSmith Studio**: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
 - **Snowflake Audit View**: `SELECT * FROM CUSTOMER_INTELLIGENCE_DB.PUBLIC.AGENT_OBSERVABILITY_LOGS LIMIT 20;`

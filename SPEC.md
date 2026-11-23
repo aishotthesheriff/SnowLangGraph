@@ -90,7 +90,7 @@ flowchart LR
 | Object | Type | Source File | Verified State |
 | --- | --- | --- | --- |
 | `CUSTOMER_INTELLIGENCE_DB.PUBLIC.CUSTOMERS` | Table | `sql/01_setup_database_and_load_data.sql` | `10,000` rows |
-| `CUSTOMER_INTELLIGENCE_DB.PUBLIC.USAGE_EVENTS` | Table | `sql/01_setup_database_and_load_data.sql` | `101,711` rows |
+| `CUSTOMER_INTELLIGENCE_DB.PUBLIC.USAGE_EVENTS` | Table | `sql/01_setup_database_and_load_data.sql` | `508,637` rows (`9,990` customers; backfilled from `101,711`) |
 | `CUSTOMER_INTELLIGENCE_DB.PUBLIC.SUPPORT_TICKETS` | Table | `sql/01_setup_database_and_load_data.sql` | `8,954` rows |
 | `CUSTOMER_INTELLIGENCE_DB.PUBLIC.CHURN_EVENTS` | Table | `sql/01_setup_database_and_load_data.sql` | `703` rows |
 | `CUSTOMER_BEHAVIOR_ANALYST` | Semantic View | `sql/03_setup_semantic_views.sql` | Active |

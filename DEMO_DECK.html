@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-Agent Customer Intelligence — Snowflake &amp; LangGraph</title>
+<!--
+  Companion deck for DEMO_SCRIPT.md and DEMO_SUMMARY_AND_TALK_TRACK.md.
+  Self-contained: no network, no CDN. Open in any browser.
+  Keys: Right/Space/PageDown = next, Left/PageUp = back, Home/End,
+        N = speaker notes, F = full screen, G = go to slide number.
+  Slides marked LIVE mean: switch to the browser tab named on the slide.
+-->
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121b2e;
+    --panel-2: #18233a;
+    --line: #26344f;
+    --text: #e8eef8;
+    --muted: #9aabc6;
+    --snow: #29b5e8;
+    --snow-dim: #1a6f8f;
+    --lg: #7fc97f;
+    --content: #8b7cf6;
+    --analyst: #e46aa6;
+    --research: #5cc49a;
+    --warn: #f2b14c;
+    --bad: #f0686a;
+    --good: #6fd08c;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05080f; color: var(--text); font-family: var(--sans); overflow: hidden; }
+
+  /* 16:9 stage scaled to the window */
+  #stage {
+    position: absolute; top: 50%; left: 50%;
+    width: 1600px; height: 900px;
+    transform-origin: center center;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    background: radial-gradient(1200px 700px at 85% -10%, rgba(41,181,232,0.10), transparent 60%), var(--bg);
+    padding: 72px 96px 80px;
+    display: none; flex-direction: column;
+    border-radius: 6px;
+  }
+  .slide.active { display: flex; }
+  .kicker { font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--snow); font-weight: 600; margin-bottom: 18px; }
+  h1 { font-size: 64px; line-height: 1.08; margin: 0 0 24px; font-weight: 750; letter-spacing: -0.01em; }
+  h2 { font-size: 52px; line-height: 1.1; margin: 0 0 32px; font-weight: 720; letter-spacing: -0.01em; }
+  h3 { font-size: 26px; margin: 0 0 12px; font-weight: 650; }
+  p, li { font-size: 28px; line-height: 1.45; color: var(--text); }
+  .muted { color: var(--muted); }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin: 0 0 14px; }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 6px; }
+  .grow { flex: 1; }
+  .row { display: flex; gap: 32px; }
+  .col { flex: 1; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px 32px; }
+  .card p, .card li { font-size: 24px; }
+  .big { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+  .mid { font-size: 56px; font-weight: 780; line-height: 1; }
+  .label { font-size: 20px; color: var(--muted); margin-top: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .tag { display: inline-block; font-size: 18px; font-weight: 650; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .footer {
+    position: absolute; left: 96px; right: 96px; bottom: 28px;
+    display: flex; justify-content: space-between; font-size: 16px; color: #5d6d8a;
+  }
+
+  /* LIVE cue slides */
+  .live { background: radial-gradient(900px 600px at 50% 40%, rgba(41,181,232,0.18), transparent 70%), #060b16; justify-content: center; align-items: center; text-align: center; }
+  .live .badge { font-size: 22px; font-weight: 800; letter-spacing: 0.2em; color: #06111d; background: var(--snow); padding: 10px 22px; border-radius: 999px; margin-bottom: 36px; }
+  .live .badge::before { content: "●"; color: var(--bad); margin-right: 10px; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: 0.2; } }
+  .live h2 { font-size: 60px; max-width: 1250px; }
+  .live .prompt { font-family: var(--mono); font-size: 30px; background: var(--panel); border: 1px solid var(--snow-dim); border-radius: 14px; padding: 26px 34px; max-width: 1250px; line-height: 1.4; }
+  .live .where { margin-top: 28px; font-size: 24px; color: var(--muted); }
+
+  /* Architecture diagram */
+  .arch { position: relative; height: 520px; }
+  .node { position: absolute; border-radius: 14px; padding: 16px 22px; font-family: var(--mono); font-size: 22px; font-weight: 600; text-align: center; border: 2px solid; background: var(--panel-2); }
+  .node small { display: block; font-family: var(--sans); font-weight: 450; font-size: 17px; color: var(--muted); margin-top: 6px; }
+  .n-sup { border-color: var(--lg); color: #cfeccf; }
+  .n-ca { border-color: var(--content); color: #d6d0ff; }
+  .n-da { border-color: var(--analyst); color: #f7cfe3; }
+  .n-ra { border-color: var(--research); color: #cff1e2; }
+  .n-sf { border-color: var(--snow); color: #cdeefb; background: rgba(41,181,232,0.08); }
+  .n-term { border-color: #4a5874; color: #c7d0e0; border-radius: 999px; }
+  svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; font-size: 24px; }
+  th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 19px; text-transform: uppercase; letter-spacing: 0.07em; }
+  td.num { font-family: var(--mono); text-align: right; }
+  .pass { color: var(--good); font-weight: 700; }
+  .miss { color: var(--warn); font-weight: 700; }
+
+  /* Flow steps */
+  .steps { display: flex; gap: 20px; align-items: stretch; }
+  .step { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; position: relative; }
+  .step .who { font-family: var(--mono); font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+  .step .val { font-size: 46px; font-weight: 800; line-height: 1.05; }
+  .step .desc { font-size: 20px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+  .arrow { align-self: center; font-size: 40px; color: #4a5874; }
+
+  .callout { border-left: 6px solid var(--snow); background: rgba(41,181,232,0.07); padding: 20px 28px; border-radius: 0 12px 12px 0; font-size: 26px; line-height: 1.45; }
+  .callout.warn { border-color: var(--warn); background: rgba(242,177,76,0.08); }
+  .callout.bad { border-color: var(--bad); background: rgba(240,104,106,0.08); }
+
+  pre { font-family: var(--mono); font-size: 20px; line-height: 1.5; background: #08101d; border: 1px solid var(--line); border-radius: 12px; padding: 22px 26px; margin: 0; white-space: pre-wrap; color: #cdd8ea; }
+  .hl { color: var(--snow); }
+  .hl2 { color: var(--warn); }
+  .hl3 { color: var(--bad); }
+
+  /* Speaker notes */
+  #notes {
+    position: fixed; left: 0; right: 0; bottom: 0; max-height: 38vh; overflow: auto;
+    background: rgba(8,12,22,0.97); border-top: 2px solid var(--snow); color: #dfe7f5;
+    padding: 18px 28px 22px; font-size: 18px; line-height: 1.55; display: none; z-index: 10;
+  }
+  #notes.show { display: block; }
+  #notes .nh { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--snow); margin-bottom: 6px; }
+  .notes { display: none; }
+  #progress { position: fixed; left: 0; top: 0; height: 4px; background: var(--snow); transition: width 0.2s; z-index: 11; }
+  #help { position: fixed; right: 14px; bottom: 10px; font-size: 13px; color: #44526d; z-index: 9; }
+  @media print {
+    html, body { overflow: visible; background: #fff; }
+    #stage { position: static; transform: none !important; width: auto; height: auto; }
+    .slide { display: flex !important; position: relative; width: 1600px; height: 900px; page-break-after: always; }
+    #notes, #progress, #help { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="stage">
+
+<!-- 1. TITLE ============================================================ -->
+<section class="slide" data-title="Title">
+  <div class="grow"></div>
+  <div class="kicker">Live demo · Snowflake + LangGraph + LangSmith</div>
+  <h1>Multi-Agent Customer Intelligence<br>you can trace end to end</h1>
+  <p class="muted" style="font-size:30px;max-width:1150px">Three specialist agents, one supervisor, governed Snowflake Semantic Views — and every SQL statement linked back to its LangSmith trace.</p>
+  <div class="grow"></div>
+  <div class="row" style="gap:14px">
+    <span class="tag">LangGraph StateGraph</span>
+    <span class="tag">Snowflake Cortex Analyst</span>
+    <span class="tag">Semantic Views</span>
+    <span class="tag">LangSmith traces + evals</span>
+    <span class="tag">TruLens</span>
+  </div>
+  <aside class="notes">
+    Optional. The script opens cold with no intro slide: you can skip straight to the next slide and go live.
+    If you use this slide, keep it to one breath: "I'm going to show you the result first, explain it second, and prove it third."
+  </aside>
+</section>
+
+<!-- 2. ACT 1 LIVE CUE =================================================== -->
+<section class="slide live" data-title="Act 1 — Cold open (LIVE)">
+  <div class="badge">LIVE · ACT 1</div>
+  <h2>“Leaders don’t ask single-table questions. They ask this.”</h2>
+  <div class="prompt">Find customers complaining about API issues and analyze their churn rate and monthly revenue</div>
+  <div class="where">Tab 1 · LangSmith Studio · new thread · graph <code>supervisor_workflow</code></div>
+  <aside class="notes">
+    Say the one line, paste, submit. Do not talk over the first node — let them watch it light up.
+    CONTENT_AGENT: "First it reads the support tickets." DATA_ANALYST_AGENT: "Then it asks Cortex Analyst about churn."
+    RESEARCH_AGENT: "Then it puts a dollar figure on it." Land it: "Three data domains, three specialists, one executive brief,
+    and the SQL for each step is traceable. Now let me show you what you just watched." (start_demo.sh cue 1 has this prompt on the clipboard.)
+  </aside>
+</section>
+
+<!-- 3. WHAT YOU JUST SAW: RESULT ======================================== -->
+<section class="slide" data-title="Act 1 — The answer">
+  <div class="kicker">Act 1 · What the run returned</div>
+  <h2>One question, three domains, one brief</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="who" style="color:var(--content)">CONTENT_AGENT</div>
+      <div class="val">502</div>
+      <div class="desc">API-related tickets across <b>461</b> customers<br>264 technical_issue · 238 integration_help<br>avg CSAT 3.03 · 132 high or urgent</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="who" style="color:var(--analyst)">DATA_ANALYST_AGENT</div>
+      <div class="val">7.58%</div>
+      <div class="desc">churn rate<br><b>110</b> churned of <b>1,452</b> customers with technical or integration tickets</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="who" style="color:var(--research)">RESEARCH_AGENT</div>
+      <div class="val">$589K</div>
+      <div class="desc">total monthly revenue ($589,348.85)<br>avg MRR $405.89 across the same 1,452 customers</div>
+    </div>
+  </div>
+  <div class="grow"></div>
+  <div class="callout">The money figure covers <b>customers with technical or integration tickets</b> (1,452) — the analysts work on ticket categories, not only the 461 who mention the API.</div>
+  <aside class="notes">
+    Use this only as a backup if the live run is slow or fails — these are the verified numbers from the live smoke check (2026-11-17).
+    Be precise on the dollar figure: "customers with technical or integration tickets", not "the 461 API customers".
+  </aside>
+</section>
+
+<!-- 4. ARCHITECTURE ===================================================== -->
+<section class="slide" data-title="Act 2 — Architecture">
+  <div class="kicker">Act 2 · What you just saw</div>
+  <h2 style="margin-bottom:12px">Hub-and-spoke: plan once, route step by step</h2>
+  <div class="arch">
+    <svg class="wires" viewBox="0 0 1408 520" preserveAspectRatio="none">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6a7a98"/>
+        </marker>
+      </defs>
+      <g stroke="#6a7a98" stroke-width="2.5" fill="none">
+        <path d="M120,60 L120,118" marker-end="url(#ah)"/>
+        <!-- supervisor to agents (out) -->
+        <path d="M330,150 C430,150 470,60 560,60" marker-end="url(#ah)" stroke="#7fc97f" stroke-dasharray="7 6"/>
+        <path d="M330,165 L560,165" marker-end="url(#ah)" stroke="#7fc97f" stroke-dasharray="7 6"/>
+        <path d="M330,180 C430,180 470,270 560,270" marker-end="url(#ah)" stroke="#7fc97f" stroke-dasharray="7 6"/>
+        <!-- agents back to supervisor -->
+        <path d="M560,84 C470,84 440,150 336,158" marker-end="url(#ah)" stroke="#8b7cf6" opacity="0.65"/>
+        <path d="M560,292 C470,292 440,190 336,175" marker-end="url(#ah)" stroke="#5cc49a" opacity="0.65"/>
+        <!-- agents to snowflake -->
+        <path d="M900,72 L1010,72" marker-end="url(#ah)" stroke="#29b5e8"/>
+        <path d="M900,177 L1010,177" marker-end="url(#ah)" stroke="#29b5e8"/>
+        <path d="M900,282 L1010,282" marker-end="url(#ah)" stroke="#29b5e8"/>
+        <!-- supervisor to end -->
+        <path d="M200,200 L200,318" marker-end="url(#ah)"/>
+      </g>
+    </svg>
+    <div class="node n-term" style="left:50px;top:14px;width:140px">START</div>
+    <div class="node n-sup" style="left:0;top:122px;width:330px">supervisor<small>plan · route · synthesize</small></div>
+    <div class="node n-term" style="left:130px;top:322px;width:140px">END</div>
+
+    <div class="node n-ca" style="left:560px;top:30px;width:340px">CONTENT_AGENT<small>support tickets · parameterized SQL</small></div>
+    <div class="node n-da" style="left:560px;top:135px;width:340px">DATA_ANALYST_AGENT<small>usage &amp; churn · Cortex Analyst</small></div>
+    <div class="node n-ra" style="left:560px;top:240px;width:340px">RESEARCH_AGENT<small>MRR &amp; lifetime · Cortex Analyst</small></div>
+
+    <div class="node n-sf" style="left:1010px;top:30px;width:398px">SUPPORT_TICKETS<small>8,954 tickets</small></div>
+    <div class="node n-sf" style="left:1010px;top:135px;width:398px">CUSTOMER_BEHAVIOR_ANALYST<small>Semantic View</small></div>
+    <div class="node n-sf" style="left:1010px;top:240px;width:398px">STRATEGIC_RESEARCH_ANALYST<small>Semantic View</small></div>
+
+    <div style="position:absolute;left:560px;top:400px;right:0" class="row">
+      <div class="card col" style="padding:18px 24px"><p style="margin:0;font-size:21px"><b>One typed <code>State</code></b> shared by every node: plan, step, agent outputs, errors, Snowflake query IDs, SQL metrics.</p></div>
+      <div class="card col" style="padding:18px 24px"><p style="margin:0;font-size:21px"><b>Live Snowflake data:</b> 10,000 customers · 508,637 usage events · 703 churn events.</p></div>
+    </div>
+  </div>
+  <aside class="notes">
+    Point at the nodes that just ran in Studio, or use this slide if the canvas is hard to read from the back.
+    "One supervisor plans once, routes step by step, and writes the final brief. Three specialists do the work.
+    They share one typed State contract, and they read live Snowflake data behind two governed Semantic Views."
+    After each agent, control returns to the supervisor, which routes to the next step or synthesizes.
+  </aside>
+</section>
+
+<!-- 5. DESIGN TRADE-OFF ================================================= -->
+<section class="slide" data-title="Act 2 — The trade-off">
+  <div class="kicker">Act 2 · The design decision</div>
+  <h2>The planner is not an LLM — on purpose</h2>
+  <div class="row grow">
+    <div class="col card">
+      <h3 style="color:var(--lg)">Deterministic routing (Python)</h3>
+      <ul>
+        <li>Matches question terms to agents (word starts: <code>api</code> matches “APIs”, not “rapid”)</li>
+        <li>Same question → same route, every time</li>
+        <li>Zero tokens spent on routing</li>
+        <li>Covered by an offline unit-test suite — no Snowflake login needed</li>
+        <li>Misses fall back to the analyst and are tagged <code>planner_fallback</code></li>
+      </ul>
+    </div>
+    <div class="col card">
+      <h3 style="color:var(--snow)">LLM only where it earns its cost</h3>
+      <ul>
+        <li>Cortex Analyst turns English into SQL over governed Semantic Views</li>
+        <li>The trial account blocks <code>AI_COMPLETE</code>, Cortex Search and the Agent <code>:run</code> endpoint</li>
+        <li>Cortex Analyst REST + <code>SEMANTIC_VIEW(...)</code> SQL run natively on trial</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    "I chose that on purpose. This is a Snowflake trial account, and it blocks AI_COMPLETE. So I put the LLM only where it earns its cost —
+    Cortex Analyst turning English into governed SQL — and kept routing deterministic."
+    If asked about questions the rules miss: "Unmatched questions fall back to the data analyst, and the trace is tagged planner_fallback,
+    so I can count misses in LangSmith." Managed Cortex Agents mode is one env flag away, but untested on this trial — say so.
+  </aside>
+</section>
+
+<!-- 6. ACT 3 LIVE CUE =================================================== -->
+<section class="slide live" data-title="Act 3 — Split screen (LIVE)">
+  <div class="badge">LIVE · ACT 3</div>
+  <h2>Same run, two systems</h2>
+  <div class="row" style="gap:28px;max-width:1250px;width:100%;text-align:left">
+    <div class="card col">
+      <h3 style="color:var(--lg)">Left · LangSmith</h3>
+      <p style="margin:0;font-size:22px">Open the Act 1 trace → expand waterfall → click a <code>snowflake_sql_execute</code> span → show <code>snowflake_query_id</code> and <code>snowflake_query_tag</code> → Feedback tab → copy the trace ID.</p>
+    </div>
+    <div class="card col">
+      <h3 style="color:var(--snow)">Right · Snowsight</h3>
+      <p style="margin:0;font-size:22px">Paste the trace ID into the staged query on <code>AGENT_OBSERVABILITY_LOGS</code> → Run → Chart → Bar, X = <code>STEP_LABEL</code>. Expect 3 bars (5 queries across 3 agents).</p>
+    </div>
+  </div>
+  <div class="where">start_demo.sh cue 2 = chart SQL with the warmup trace ID · <code>s</code> = SQL for the newest trace</div>
+  <aside class="notes">
+    "I am copying this ID out of LangSmith… and pasting it into Snowflake."
+    Feedback on the root run: execution_success 1.0, non_empty_results 1.0, zero_errors 1.0, step_count 3.0.
+    Do not quote per-bar timings — they vary per run. If the chart returns no rows, query history can lag: run it again.
+  </aside>
+</section>
+
+<!-- 7. TWO-WAY LINK ===================================================== -->
+<section class="slide" data-title="Act 3 — Two-way trace link">
+  <div class="kicker">Act 3 · Why this matters</div>
+  <h2>The database stops being a black box</h2>
+  <div class="row">
+    <div class="col">
+      <pre><span class="muted">-- every SQL statement the agent runs carries</span>
+QUERY_TAG = {
+  <span class="hl">"app"</span>:      "snowlanggraph",
+  <span class="hl">"trace_id"</span>: "&lt;LangSmith trace id&gt;",
+  <span class="hl">"agent"</span>:    "RESEARCH_AGENT",
+  <span class="hl">"step"</span>:     3,
+  <span class="hl">"tool"</span>:     "CORTEX_ANALYST_SQL"
+}
+<span class="muted">-- and every LangSmith SQL span carries</span>
+snowflake_query_id = <span class="hl2">&lt;sfqid&gt;</span></pre>
+    </div>
+    <div class="col">
+      <ul>
+        <li><b>LangSmith → Snowflake:</b> each SQL span holds the Snowflake query ID</li>
+        <li><b>Snowflake → LangSmith:</b> each query is tagged with the trace ID, read through <code>AGENT_OBSERVABILITY_LOGS</code></li>
+        <li>The tag is sent <b>per statement</b>, so concurrent users on one shared session never mix tags</li>
+        <li>A platform team can check SQL time and rows per agent step from inside Snowflake — no LangSmith access needed</li>
+      </ul>
+    </div>
+  </div>
+  <div class="grow"></div>
+  <div class="callout">Text-to-SQL time lives on the LangSmith side. The Cortex Analyst REST call itself is not tagged — only the SQL it produces.</div>
+  <aside class="notes">
+    "Most agent demos stop on the left. You see node timings, and the database is a black box. On the right is Snowflake's own query history
+    for the same run." Be honest about the boundary: the Analyst REST call is not in query history; the SQL it generates is.
+  </aside>
+</section>
+
+<!-- 8. ACT 4 LIVE CUE =================================================== -->
+<section class="slide live" data-title="Act 4 — One hop (LIVE)">
+  <div class="badge">LIVE · ACT 4</div>
+  <h2>A simple question takes one hop, not three</h2>
+  <div class="prompt">What industries have the highest total MRR and average customer lifetime?</div>
+  <div class="where">Tab 1 · Studio · new thread · only <b style="color:var(--research)">RESEARCH_AGENT</b> should light up</div>
+  <aside class="notes">
+    Expected: healthcare $423,966.55 MRR, finance $405,595.52, education $397,174.61; average lifetime about 390–450 days for churned customers.
+    "Same graph, different question, one hop. The supervisor does not spend calls on agents it does not need."
+  </aside>
+</section>
+
+<!-- 9. WHY A SEMANTIC VIEW ============================================== -->
+<section class="slide" data-title="Act 4 — Why a Semantic View">
+  <div class="kicker">Act 4 · The CLV story</div>
+  <h2>The model refused to guess — and that was right</h2>
+  <div class="row grow">
+    <div class="col card">
+      <span class="tag" style="color:var(--warn);border-color:var(--warn)">Before</span>
+      <p style="font-size:24px;margin:18px 0 12px">“What is the average customer lifetime value by industry?”</p>
+      <div class="callout warn" style="font-size:22px">Cortex Analyst: <i>customer lifetime value is not defined in the semantic model, and there are several valid ways to calculate it. Which one do you mean?</i></div>
+      <p class="muted" style="font-size:21px;margin-top:16px">No SQL written. Showed up as the 1 miss in 12 eval runs — treated as a finding, not hidden.</p>
+    </div>
+    <div class="col card">
+      <span class="tag" style="color:var(--good);border-color:var(--good)">After</span>
+      <p style="font-size:24px;margin:18px 0 12px">Defined once, in both Semantic Views:</p>
+      <pre style="font-size:19px">CUSTOMER_LIFETIME_VALUE =
+  final_monthly_revenue
+  × days_since_signup / 30
+  <span class="muted">-- realized CLV, churned customers</span></pre>
+      <p style="font-size:22px;margin-top:16px">media ≈ <b>$6,782</b> · manufacturing ≈ <b>$6,730</b> · technology ≈ <b>$5,034</b></p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:24px">The LLM translates English into SQL — but only over metrics, joins and synonyms the business has defined. The definition lives under Snowflake governance, not in a prompt.</div>
+  <aside class="notes">
+    Live cue (optional): ask "What is the average customer lifetime value by industry?" in a new Studio thread and point at the interpretation line.
+    "A model that guesses a business formula gives you a confident number nobody can audit." If asked whether it's a good CLV formula:
+    "It is a realized value for customers who already left, so it understates active customers. A predictive CLV is the next step — a change in one place."
+  </aside>
+</section>
+
+<!-- 10. ACT 4B: TRACE CAUGHT BAD BEHAVIOR =============================== -->
+<section class="slide" data-title="Act 4B — Trace caught bad behavior">
+  <div class="kicker">Act 4B · Optional · A failure, on purpose</div>
+  <h2>Green checks. Wrong answer.</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <p style="font-family:var(--mono);font-size:22px;margin:0 0 18px">How many urgent API support tickets are there?</p>
+        <div class="row" style="gap:20px">
+          <div><div class="mid" style="color:var(--bad)">729</div><div class="label">“urgent API” tickets</div></div>
+          <div><div class="mid">642</div><div class="label">customers</div></div>
+        </div>
+        <p style="font-size:21px;margin:22px 0 0" class="muted">Sample <code>TKT_00006033</code>: “I forgot my password and the reset email isn’t coming through. Need access <span class="hl3">urgently</span>.”</p>
+      </div>
+    </div>
+    <div class="col">
+      <pre><span class="muted">-- one clause per keyword, OR-ed together</span>
+WHERE (LOWER(ticket_text) LIKE ? OR LOWER(category) LIKE ?)
+   OR (...)  <span class="muted">-- × 5 keywords:</span>
+<span class="muted">-- </span><span class="hl3">urgent</span> · api · <span class="hl3">support</span> · tickets · <span class="hl3">there</span></pre>
+      <p style="font-size:22px;margin-top:18px">No error. Rows returned. Every evaluator passes.</p>
+    </div>
+  </div>
+  <div class="grow"></div>
+  <div class="callout bad">Fix options the trace makes visible: require every keyword · use the priority column · route it to Cortex Analyst + a Semantic View. Next evaluator: <b>answer relevance</b>.</div>
+  <aside class="notes">
+    Live cue: ask the question in a new Studio thread, then open snowflake_support_tickets_search and its snowflake_sql_execute spans.
+    "Nothing crashed, so a normal error alert would stay quiet. The trace is what let me see it. Without the trace, I would be shipping 729 as the answer."
+    The SQL on the slide is the WHERE clause shape from run_content_sql_search (parameterized) — show the real SQL in the trace. Do not quote 186 as "urgent only": it counts high OR urgent.
+    This bug is intentionally unfixed until after the demo (PARKED.md).
+  </aside>
+</section>
+
+<!-- 11. ACT 5 EVALS ===================================================== -->
+<section class="slide" data-title="Act 5 — Evals">
+  <div class="kicker">Act 5 · Evals at two points</div>
+  <h2>Every request scored. Every change regression-tested.</h2>
+  <div class="row grow">
+    <div class="col card">
+      <h3 style="color:var(--lg)">Online feedback · every live run</h3>
+      <ul>
+        <li><code>execution_success</code></li>
+        <li><code>non_empty_results</code></li>
+        <li><code>zero_errors</code></li>
+        <li><code>step_count</code></li>
+      </ul>
+      <p class="muted" style="font-size:21px">Written to the root run in LangSmith — you saw them in Act 3.</p>
+    </div>
+    <div class="col card" style="flex:1.35">
+      <h3 style="color:var(--snow)">Offline regression · 12-question golden set</h3>
+      <table>
+        <tr><th>Evaluator</th><th style="text-align:right">Result</th></tr>
+        <tr><td><code>route_match</code></td><td class="num pass">12 / 12</td></tr>
+        <tr><td><code>eval_zero_errors</code></td><td class="num pass">12 / 12</td></tr>
+        <tr><td><code>sql_executed_with_rows</code></td><td class="num miss">11 / 12</td></tr>
+      </table>
+      <p class="muted" style="font-size:20px;margin-top:16px">Experiment <code>snowlanggraph-trial-09f9954a</code> · the miss is the CLV question, before the Semantic View fix · plus TruLens <code>TruGraph</code> recording</p>
+    </div>
+  </div>
+  <aside class="notes">
+    Tab 2 (LangSmith Experiments, snowlanggraph-trial-09f9954a — the 12-question run with the CLV miss). Optional live command: .venv/bin/python evaluate_observability.py (~35s; publishes an experiment).
+    "When I change a Semantic View or a planner rule, I re-run the suite and compare experiments side by side before shipping."
+  </aside>
+</section>
+
+<!-- 12. PRODUCTION PATH ================================================= -->
+<section class="slide" data-title="Act 5 — Production path">
+  <div class="kicker">Act 5 · Production upgrade path</div>
+  <h2>Same graph, one flag</h2>
+  <table>
+    <tr><th></th><th>Today · trial account <span class="pass">(live)</span></th><th>Full account <span class="miss">(written, untested)</span></th></tr>
+    <tr><td><b>Workers</b></td><td>Cortex Analyst REST + parameterized SQL</td><td>Snowflake-managed Cortex Agents</td></tr>
+    <tr><td><b>Ticket search</b></td><td>Keyword SQL on <code>SUPPORT_TICKETS</code></td><td>Cortex Search (<code>sql/02</code>)</td></tr>
+    <tr><td><b>Tools</b></td><td>—</td><td>Cortex UDFs (<code>sql/04</code>)</td></tr>
+    <tr><td><b>Judges</b></td><td>Deterministic evaluators</td><td>TruLens Cortex-backed judges</td></tr>
+    <tr><td><b>Switch</b></td><td><code>SNOWFLAKE_USE_CORTEX_AGENTS=false</code></td><td><code>SNOWFLAKE_USE_CORTEX_AGENTS=true</code></td></tr>
+  </table>
+  <div class="grow"></div>
+  <div class="callout warn">Planning and synthesis stay deterministic in both modes. Managed mode needs a paid account and has not been tested live — and I say so.</div>
+  <aside class="notes">
+    "Everything you saw ran live on a Snowflake trial account. On a full account, running sql/02 and sql/04 and setting
+    SNOWFLAKE_USE_CORTEX_AGENTS=true swaps in Snowflake-managed Cortex Agents and Cortex Search on the same graph.
+    That mode is written and not yet tested, because the trial blocks it."
+  </aside>
+</section>
+
+<!-- 13. NEXT STEPS / Q&A ================================================ -->
+<section class="slide" data-title="Close — Next & Q&A">
+  <div class="kicker">Close</div>
+  <h2>What’s next</h2>
+  <div class="row grow">
+    <div class="col">
+      <ul>
+        <li><b>Answer-relevance evaluator</b> — Act 4B is its first test case</li>
+        <li><b>Tighter ticket search</b> — AND logic or the priority column</li>
+        <li><b>Predictive CLV</b> — one change, in the Semantic View</li>
+        <li><b>Managed mode</b> — validate on a paid account</li>
+      </ul>
+    </div>
+    <div class="col card" style="align-self:flex-start">
+      <h3>Takeaways</h3>
+      <ul>
+        <li>Put the LLM where it earns its cost</li>
+        <li>Define business metrics once, in the data platform</li>
+        <li>Link traces both ways — agent ↔ warehouse</li>
+        <li>Evals and traces catch what error alerts miss</li>
+      </ul>
+    </div>
+  </div>
+  <div style="text-align:center;font-size:44px;font-weight:750;margin-top:20px">Questions?</div>
+  <aside class="notes">
+    Keep the close short (about 20 seconds), then open Q&amp;A. Leave Studio open in another tab for follow-up questions.
+  </aside>
+</section>
+
+</div><!-- /stage -->
+
+<div id="notes"><div class="nh" id="notes-title">Speaker notes</div><div id="notes-body"></div></div>
+<div id="help">← → navigate · N notes · F full screen · G go to</div>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const stage = document.getElementById('stage');
+  const notes = document.getElementById('notes');
+  const notesBody = document.getElementById('notes-body');
+  const notesTitle = document.getElementById('notes-title');
+  const progress = document.getElementById('progress');
+  const total = slides.length;
+  let idx = 0;
+
+  // Footer with slide number on every slide
+  slides.forEach((s, i) => {
+    const f = document.createElement('div');
+    f.className = 'footer';
+    f.innerHTML = '<span>Snowflake + LangGraph · Multi-Agent Customer Intelligence</span><span>' + (i + 1) + ' / ' + total + '</span>';
+    s.appendChild(f);
+  });
+
+  function fit() {
+    const scale = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+
+  function show(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    const s = slides[idx];
+    const n2 = s.querySelector('.notes');
+    notesTitle.textContent = 'Speaker notes · ' + (idx + 1) + '/' + total + ' · ' + (s.dataset.title || '');
+    notesBody.textContent = n2 ? n2.textContent.trim().replace(/\s+/g, ' ') : '(none)';
+    progress.style.width = ((idx + 1) / total * 100) + '%';
+    if (location.hash !== '#' + (idx + 1)) history.replaceState(null, '', '#' + (idx + 1));
+    document.title = (idx + 1) + '/' + total + ' · ' + (s.dataset.title || 'Deck');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter'].includes(k)) { e.preventDefault(); show(idx + 1); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); show(idx - 1); }
+    else if (k === 'Home') show(0);
+    else if (k === 'End') show(total - 1);
+    else if (k === 'n' || k === 'N') notes.classList.toggle('show');
+    else if (k === 'f' || k === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else document.exitFullscreen();
+    } else if (k === 'g' || k === 'G') {
+      const v = parseInt(prompt('Go to slide (1-' + total + '):', String(idx + 1)), 10);
+      if (!isNaN(v)) show(v - 1);
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#notes')) return;
+    if (e.clientX > window.innerWidth * 0.33) show(idx + 1); else show(idx - 1);
+  });
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', () => {
+    const h = parseInt(location.hash.slice(1), 10);
+    if (!isNaN(h) && h - 1 !== idx) show(h - 1);
+  });
+
+  fit();
+  const start = parseInt(location.hash.slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
